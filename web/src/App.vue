@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { connect } from 'echarts/core'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useClients, useHistory, useLiveStatus } from './api/live'
 import ClientsTable from './components/ClientsTable.vue'
 import ConstellationLegend from './components/ConstellationLegend.vue'
@@ -31,6 +31,26 @@ const { samples, loading } = useHistory(minutes)
 const { clients } = useClients()
 
 const gps = computed(() => status.value?.gps)
+
+// Sky view filter, remembered per browser.
+const skyUsedOnly = ref(readFlag('skyUsedOnly'))
+watch(skyUsedOnly, (v) => writeFlag('skyUsedOnly', v))
+const skySatellites = computed(() => (gps.value?.satellites ?? []).filter((s) => !skyUsedOnly.value || s.used))
+
+function readFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === '1'
+  } catch {
+    return false
+  }
+}
+function writeFlag(key: string, v: boolean) {
+  try {
+    localStorage.setItem(key, v ? '1' : '0')
+  } catch {
+    /* storage blocked: keep in memory only */
+  }
+}
 const chrony = computed(() => status.value?.chrony)
 const tracking = computed(() => chrony.value?.tracking ?? null)
 const sys = computed(() => status.value?.system)
@@ -187,9 +207,12 @@ const systemInfo = computed<[string, string][]>(() => {
       <div class="card">
         <div class="card-head">
           <h2>Sky view</h2>
-          <span class="sub">{{ gps?.fix.mode.toUpperCase() }} · elevation rings 0/30/60°</span>
+          <label class="toggle">
+            <input v-model="skyUsedOnly" type="checkbox" />
+            Used only
+          </label>
         </div>
-        <SkyPlot v-if="gps" :satellites="gps.satellites" />
+        <SkyPlot v-if="gps" :satellites="skySatellites" />
         <ConstellationLegend v-if="gps" :gps="gps" />
       </div>
       <div class="card">
@@ -315,6 +338,19 @@ button.ghost {
   border-color: transparent;
   background: none;
   color: var(--ink-2);
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+}
+.toggle input {
+  margin: 0;
+  accent-color: var(--series-1);
 }
 .charts {
   display: grid;
