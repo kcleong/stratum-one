@@ -3,11 +3,11 @@ import contextlib
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Query, Response, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
 from .config import load_settings
+from .models import ChronyStatus, Client, GpsStatus, Health, HistorySample, Satellite, Status, SystemStatus
 from .monitor import Monitor
 from .mqtt import MqttPublisher
 
@@ -39,54 +39,60 @@ def _monitor() -> Monitor:
 
 
 @app.get("/api/status", summary="Everything: GPS, chrony and host stats")
-def status() -> dict:
+def status() -> Status:
     return _monitor().snapshot()
 
 
 @app.get("/api/gps", summary="GPS fix, DOPs and satellites")
-def gps() -> dict:
+def gps() -> GpsStatus:
     return _monitor().gps.snapshot()
 
 
 @app.get("/api/gps/satellites", summary="Satellites in view")
-def satellites() -> list[dict]:
-    return _monitor().gps.snapshot()["satellites"]
+def satellites() -> list[Satellite]:
+    return _monitor().gps.snapshot().satellites
 
 
 @app.get("/api/chrony", summary="chrony tracking, sources, sourcestats, serverstats")
-def chrony() -> dict:
+def chrony() -> ChronyStatus:
     return _monitor().chrony.snapshot()
 
 
 @app.get("/api/chrony/clients", summary="NTP clients seen by chrony")
-def clients() -> list[dict]:
+def clients() -> list[Client]:
     return _monitor().chrony.clients
 
 
 @app.get("/api/system", summary="Host temperature, load, uptime, memory")
-def system() -> dict:
-    return _monitor().snapshot()["system"]
+def system() -> SystemStatus:
+    return _monitor().snapshot().system
 
 
 @app.get("/api/history", summary="Time series of offsets, frequency, satellites and temperature")
-def history(minutes: float = Query(60, gt=0, le=24 * 60)) -> list[dict]:
+def history(minutes: float = Query(60, gt=0, le=24 * 60)) -> list[HistorySample]:
     return _monitor().history_since(minutes * 60)
 
 
-@app.get("/healthz", summary="200 when gpsd and chrony are reachable, else 503")
-def healthz() -> JSONResponse:
+@app.get(
+    "/healthz",
+    summary="200 when gpsd and chrony are reachable, else 503",
+    responses={503: {"model": Health, "description": "gpsd or chronyd unreachable"}},
+)
+def healthz(response: Response) -> Health:
     monitor = _monitor()
-    checks = {"gpsd": monitor.gps.connected, "chrony": monitor.chrony.error is None}
-    return JSONResponse(checks, status_code=200 if all(checks.values()) else 503)
+    health = Health(gpsd=monitor.gps.connected, chrony=monitor.chrony.error is None)
+    if not (health.gpsd and health.chrony):
+        response.status_code = 503
+    return health
 
 
 @app.websocket("/api/ws")
 async def ws(websocket: WebSocket, interval: float = 1.0) -> None:
-    """Pushes /api/status every `interval` seconds (min 0.5)."""
+    """Pushes a `Status` document (as /api/status) every `interval` seconds (min 0.5)."""
     await websocket.accept()
     try:
         while True:
-            await websocket.send_json(_monitor().snapshot())
+            await websocket.send_text(_monitor().snapshot().model_dump_json())
             await asyncio.sleep(max(interval, 0.5))
     except WebSocketDisconnect:
         pass

@@ -51,8 +51,8 @@ ENTITIES = [
 ]
 
 
-def _us(seconds: float | None) -> float | None:
-    return None if seconds is None else round(seconds * 1e6, 3)
+def _us(seconds: float) -> float:
+    return round(seconds * 1e6, 3)
 
 
 def _on_off(value: bool) -> str:
@@ -61,37 +61,38 @@ def _on_off(value: bool) -> str:
 
 def state_payload(monitor: Monitor) -> dict:
     snap = monitor.snapshot()
-    gps, chrony, host = snap["gps"], snap["chrony"], snap["system"]
-    tracking = chrony["tracking"] or {}
-    selected = monitor.chrony.selected_source or {}
-    pps = next((s for s in chrony["sources"] if s["mode"] == "refclock" and s["name"] == "PPS"), {})
+    gps, chrony, host = snap.gps, snap.chrony, snap.system
+    tracking = chrony.tracking
+    selected = monitor.chrony.selected_source
+    pps = monitor.chrony.pps_source
+    stats = chrony.serverstats
     return {
-        "fix": gps["fix"]["mode"],
-        "satellites_used": gps["satellites_used"],
-        "satellites_visible": gps["satellites_visible"],
-        "hdop": gps["dop"]["hdop"],
-        "pdop": gps["dop"]["pdop"],
-        "latitude": gps["fix"]["lat"],
-        "longitude": gps["fix"]["lon"],
-        "altitude": gps["fix"]["alt_msl_m"],
-        "reference": tracking.get("ref_name"),
-        "stratum": tracking.get("stratum"),
-        "system_offset_us": _us(tracking.get("system_time_offset_s")),
-        "last_offset_us": _us(tracking.get("last_offset_s")),
-        "rms_offset_us": _us(tracking.get("rms_offset_s")),
-        "pps_offset_us": _us(pps.get("offset_s")),
-        "root_dispersion_us": _us(tracking.get("root_dispersion_s")),
-        "frequency_ppm": tracking.get("frequency_ppm"),
-        "skew_ppm": tracking.get("skew_ppm"),
-        "leap_status": tracking.get("leap_status"),
-        "ntp_clients": chrony["client_count"],
-        "ntp_packets_received": (chrony["serverstats"] or {}).get("ntp_packets_received"),
-        "ntp_packets_dropped": (chrony["serverstats"] or {}).get("ntp_packets_dropped"),
-        "cpu_temp": host["cpu_temp_c"],
-        "load_1m": host["load"][0] if host["load"] else None,
-        "pps_locked": _on_off(selected.get("mode") == "refclock" and selected.get("name") == "PPS"),
-        "gpsd_connected": _on_off(gps["connected"]),
-        "chrony_ok": _on_off(chrony["ok"]),
+        "fix": gps.fix.mode,
+        "satellites_used": gps.satellites_used,
+        "satellites_visible": gps.satellites_visible,
+        "hdop": gps.dop.hdop,
+        "pdop": gps.dop.pdop,
+        "latitude": gps.fix.lat,
+        "longitude": gps.fix.lon,
+        "altitude": gps.fix.alt_msl_m,
+        "reference": tracking.ref_name if tracking else None,
+        "stratum": tracking.stratum if tracking else None,
+        "system_offset_us": _us(tracking.system_time_offset_s) if tracking else None,
+        "last_offset_us": _us(tracking.last_offset_s) if tracking else None,
+        "rms_offset_us": _us(tracking.rms_offset_s) if tracking else None,
+        "pps_offset_us": _us(pps.offset_s) if pps else None,
+        "root_dispersion_us": _us(tracking.root_dispersion_s) if tracking else None,
+        "frequency_ppm": tracking.frequency_ppm if tracking else None,
+        "skew_ppm": tracking.skew_ppm if tracking else None,
+        "leap_status": tracking.leap_status if tracking else None,
+        "ntp_clients": chrony.client_count,
+        "ntp_packets_received": stats.ntp_packets_received if stats else None,
+        "ntp_packets_dropped": stats.ntp_packets_dropped if stats else None,
+        "cpu_temp": host.cpu_temp_c,
+        "load_1m": host.load[0] if host.load else None,
+        "pps_locked": _on_off(selected is not None and selected is pps),
+        "gpsd_connected": _on_off(gps.connected),
+        "chrony_ok": _on_off(chrony.ok),
     }
 
 
