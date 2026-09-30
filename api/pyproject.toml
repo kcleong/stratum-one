@@ -3,6 +3,7 @@ name = "stratum-api"
 version = "0.1.0"
 description = "HTTP, WebSocket and MQTT stats for the stratum_one GPS/PPS NTP server"
 requires-python = ">=3.14"
+license = "MIT"
 dependencies = [
     "aiomqtt>=2.5",
     "fastapi>=0.142",

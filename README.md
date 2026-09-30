@@ -177,3 +177,7 @@ Adjust the `allow` lines in `chrony.conf` to your LAN ranges.
   last saved time; `makestep 1 3` corrects it on the first updates.
 - **No `CAP_SYS_TIME` elsewhere**: never run another time daemon in other
   containers.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
