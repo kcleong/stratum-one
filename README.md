@@ -1,0 +1,119 @@
+# stratum_one
+
+GPS + PPS disciplined stratum-1 NTP server on a Raspberry Pi 4 (`berry-well`),
+run with Docker Compose.
+
+- **gpsd** reads NMEA from the GPS over UART (`/dev/ttyAMA2`) and publishes
+  coarse time via shared memory (SHM 0).
+- **chrony** uses NMEA to number the seconds and the kernel PPS signal
+  (`/dev/pps0`) for the precise edge, then serves NTP on UDP 123.
+
+Expected accuracy: ~1–5 µs local, LAN clients typically < 0.1 ms.
+
+## Hardware / wiring
+
+Use a 3.3 V logic GPS module with a PPS output (e.g. u-blox NEO-M8N).
+**Do not connect 5 V logic to the GPIO pins.**
+
+| GPS pin | Pi GPIO | Physical pin | Notes            |
+|---------|---------|--------------|------------------|
+| VCC     | 3.3 V   | 1            | or 5 V (pin 2) if the module requires 5 V supply (logic still 3.3 V) |
+| GND     | GND     | 6            |                  |
+| TX      | GPIO1   | 28           | uart2 RX         |
+| RX      | GPIO0   | 27           | uart2 TX         |
+| PPS     | GPIO18  | 12           | pps-gpio         |
+
+uart2 uses GPIO0/1 (the HAT ID EEPROM pins), so don't combine with a HAT
+that has an ID EEPROM. uart2 is a full PL011 UART, unlike the mini UART,
+so its baud rate does not depend on the core clock.
+
+Give the antenna a clear sky view; first fix can take several minutes.
+
+## Host setup (manual, once, needs sudo)
+
+1. **Enable UART and PPS** in `/boot/firmware/config.txt`, under `[all]`:
+   ```
+   enable_uart=1
+   dtoverlay=uart2
+   dtoverlay=pps-gpio,gpiopin=18
+   ```
+   (`enable_uart=1` and `uart2` are already present on berry-well.)
+
+2. **No serial console** on the GPS UART: `/boot/firmware/cmdline.txt` must
+   not contain `console=serial0,...` or `console=ttyAMA2,...`.
+
+3. **Enable memory cgroup** so `mem_limit` works: append to the single line in
+   `/boot/firmware/cmdline.txt`:
+   ```
+   cgroup_enable=memory
+   ```
+
+4. **Disable host chrony** (two NTP daemons fight over the clock):
+   ```
+   sudo systemctl disable --now chrony
+   sudo systemctl mask chrony
+   ```
+
+5. **Docker**: install `docker-ce` + `docker-compose-plugin` from
+   download.docker.com (Debian trixie, arm64), then keep container logs off
+   the SD card (journald is volatile on Pi OS):
+   ```
+   echo '{ "log-driver": "journald" }' | sudo tee /etc/docker/daemon.json
+   sudo systemctl enable --now docker
+   sudo usermod -aG docker $USER   # re-login afterwards
+   ```
+
+6. **Reboot**, then verify:
+   ```
+   ls -l /dev/pps0 /dev/ttyAMA2
+   grep memory /sys/fs/cgroup/cgroup.controllers
+   sudo apt install pps-tools && sudo ppstest /dev/pps0   # one line per second once GPS has a fix
+   ```
+
+## Run
+
+```
+docker compose up -d --build
+docker compose logs -f
+```
+
+Containers restart automatically on boot (`restart: unless-stopped`).
+
+## Check
+
+```
+docker compose exec chrony chronyc sources -v     # PPS should show '*' after a few minutes
+docker compose exec chrony chronyc sourcestats
+docker compose exec chrony chronyc tracking       # RMS offset: a few µs
+docker compose exec chrony chronyc clients        # who is querying
+```
+
+### Tune the NMEA offset
+
+NMEA sentences arrive late by a module-specific amount. After ~1 h with a
+fix, look at the `GPS` line in `chronyc sourcestats` (Offset column) and
+set `offset` in `chrony.conf` so the GPS offset is near 0 relative to PPS.
+Then `docker compose restart chrony`.
+
+## Clients
+
+Point clients at the Pi, e.g. for chrony:
+```
+server berry-well.local iburst prefer
+```
+or for systemd-timesyncd (`/etc/systemd/timesyncd.conf`): `NTP=berry-well.local`.
+
+Adjust the `allow` lines in `chrony.conf` to your LAN ranges.
+
+## Notes
+
+- **Docker does not hurt timing**: PPS is timestamped in the kernel IRQ,
+  `network_mode: host` avoids NAT, no CPU limits are set, and
+  `SYS_NICE`/`IPC_LOCK` allow real-time priority and locked memory.
+- **Load and temperature**: sustained 100 % CPU load heats the SoC and shifts
+  the crystal frequency, causing µs-level wander. Avoid long full-load jobs
+  next to this; keep cooling steady.
+- **Boot**: the Pi 4 has no RTC. Until Docker starts, the clock runs from the
+  last saved time; `makestep 1 3` corrects it on the first updates.
+- **No `CAP_SYS_TIME` elsewhere**: never run another time daemon in other
+  containers.
