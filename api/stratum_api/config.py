@@ -11,7 +11,8 @@ class Settings:
     gpsd_host: str
     gpsd_port: int
     chrony_interval: float     # seconds between chronyc polls (also history resolution)
-    history_hours: float
+    history_hours: float       # in memory at full resolution
+    history_days: float        # kept in SQLite, served as bucket averages
     history_db: str | None     # SQLite path; history is memory-only when unset
     history_flush_minutes: float
     node_id: str               # device name in HA and MQTT topics
@@ -34,6 +35,7 @@ def load_settings() -> Settings:
         gpsd_port=int(env("GPSD_PORT", "2947")),
         chrony_interval=float(env("CHRONY_INTERVAL", "5")),
         history_hours=float(env("HISTORY_HOURS", "24")),
+        history_days=float(env("HISTORY_DAYS", "30")),
         history_db=env("HISTORY_DB", "/data/history.db") or None,
         history_flush_minutes=float(env("HISTORY_FLUSH_MINUTES", "15")),
         node_id=env("NODE_ID") or socket.gethostname(),

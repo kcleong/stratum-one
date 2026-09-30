@@ -1,5 +1,5 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue'
-import type { Client, HistorySample, Status } from './types'
+import type { Client, HistoryPoint, Status } from './types'
 
 /** Live /api/status over the WebSocket, reconnecting on loss. */
 export function useLiveStatus() {
@@ -35,20 +35,29 @@ export function useLiveStatus() {
   return { status, connected, clockDelta }
 }
 
-/** /api/history for the last `minutes`, topped up incrementally every 5 s. */
+/** Ranges up to this many minutes are raw 5 s samples served from memory. */
+export const RAW_MAX_MINUTES = 24 * 60
+
+/**
+ * /api/history for the last `minutes`. Raw ranges (≤ 24 h) are topped up
+ * incrementally every 5 s; longer, bucket-averaged ranges refetch every minute.
+ */
 export function useHistory(minutes: Ref<number>) {
-  const samples = shallowRef<HistorySample[]>([])
+  const samples = shallowRef<HistoryPoint[]>([])
+  const bucketSeconds = ref(5)
   const loading = ref(false)
   let timer: number | undefined
+  let slowTimer: number | undefined
 
-  async function fetchSince(mins: number): Promise<HistorySample[]> {
-    const res = await fetch(`/api/history?minutes=${Math.min(mins, 1440)}`)
+  async function fetchSince(mins: number): Promise<HistoryPoint[]> {
+    const res = await fetch(`/api/history?minutes=${mins}`)
     if (!res.ok) throw new Error(`history: HTTP ${res.status}`)
+    bucketSeconds.value = Number(res.headers.get('X-History-Bucket-Seconds')) || 5
     return res.json()
   }
 
-  async function reload() {
-    loading.value = true
+  async function reload(dim = true) {
+    loading.value = dim
     try {
       samples.value = await fetchSince(minutes.value)
     } catch (e) {
@@ -59,8 +68,9 @@ export function useHistory(minutes: Ref<number>) {
   }
 
   async function topUp() {
+    if (minutes.value > RAW_MAX_MINUTES) return // handled by the slow refresh
     const last = samples.value.at(-1)
-    if (!last) return reload()
+    if (!last) return reload(false)
     try {
       const gap = (Date.now() / 1000 - last.t) / 60 + 0.25
       const fresh = (await fetchSince(Math.max(gap, 0.1))).filter((s) => s.t > last.t)
@@ -72,13 +82,17 @@ export function useHistory(minutes: Ref<number>) {
     }
   }
 
-  watch(minutes, reload)
+  watch(minutes, () => reload())
   onMounted(() => {
     reload()
     timer = window.setInterval(topUp, 5000)
+    slowTimer = window.setInterval(() => minutes.value > RAW_MAX_MINUTES && reload(false), 60000)
   })
-  onBeforeUnmount(() => clearInterval(timer))
-  return { samples, loading }
+  onBeforeUnmount(() => {
+    clearInterval(timer)
+    clearInterval(slowTimer)
+  })
+  return { samples, bucketSeconds, loading }
 }
 
 /** NTP clients change slowly; poll every 30 s. */

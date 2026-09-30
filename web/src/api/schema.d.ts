@@ -113,7 +113,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Time series of offsets, frequency, satellites and temperature */
+        /**
+         * Time series of offsets, frequency, satellites and temperature
+         * @description Up to HISTORY_HOURS (24 h): raw 5 s samples. Longer, up to HISTORY_DAYS (30 d): bucket averages of at most ~1500 points with offset min/max. The `X-History-Bucket-Seconds` header gives the resolution.
+         */
         get: operations["history_api_history_get"];
         put?: never;
         post?: never;
@@ -327,8 +330,14 @@ export interface components {
             /** Chrony */
             chrony: boolean;
         };
-        /** HistorySample */
-        HistorySample: {
+        /**
+         * HistoryPoint
+         * @description A raw sample (ranges up to 24 h) or a bucket average (longer ranges).
+         *
+         *     For bucket averages `t` is the bucket centre, the other fields are means,
+         *     and the offset min/max fields bound what the mean hides.
+         */
+        HistoryPoint: {
             /**
              * T
              * @description Unix time
@@ -352,6 +361,14 @@ export interface components {
             satellites_visible: number;
             /** Cpu Temp C */
             cpu_temp_c: number | null;
+            /** System Time Offset Min S */
+            system_time_offset_min_s?: number | null;
+            /** System Time Offset Max S */
+            system_time_offset_max_s?: number | null;
+            /** Pps Offset Min S */
+            pps_offset_min_s?: number | null;
+            /** Pps Offset Max S */
+            pps_offset_max_s?: number | null;
         };
         /** Satellite */
         Satellite: {
@@ -737,7 +754,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HistorySample"][];
+                    "application/json": components["schemas"]["HistoryPoint"][];
                 };
             };
             /** @description Validation Error */

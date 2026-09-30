@@ -8,12 +8,24 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import TypeAdapter
 
 from .config import load_settings
-from .models import ChronyStatus, Client, GpsStatus, Health, HistorySample, Satellite, Status, SystemStatus
+from .models import (
+    ChronyStatus,
+    Client,
+    GpsStatus,
+    Health,
+    HistoryPoint,
+    HistorySample,
+    Satellite,
+    Status,
+    SystemStatus,
+)
 from .monitor import Monitor
 from .mqtt import MqttPublisher
 
 log = logging.getLogger(__name__)
-HISTORY_JSON = TypeAdapter(list[HistorySample])
+HISTORY_RAW_JSON = TypeAdapter(list[HistorySample])
+HISTORY_BUCKET_JSON = TypeAdapter(list[HistoryPoint])
+MAX_HISTORY_MINUTES = 30 * 24 * 60
 STATIC_DIR = Path(__file__).parent.parent / "static"   # web UI, built by the Dockerfile web stage
 
 
@@ -79,13 +91,25 @@ def system() -> SystemStatus:
 @app.get(
     "/api/history",
     summary="Time series of offsets, frequency, satellites and temperature",
-    response_model=list[HistorySample],
+    description=(
+        "Up to HISTORY_HOURS (24 h): raw 5 s samples. Longer, up to HISTORY_DAYS (30 d): bucket "
+        "averages of at most ~1500 points with offset min/max. The `X-History-Bucket-Seconds` "
+        "header gives the resolution."
+    ),
+    response_model=list[HistoryPoint],
 )
-def history(minutes: float = Query(60, gt=0, le=24 * 60)) -> Response:
+async def history(minutes: float = Query(60, gt=0, le=MAX_HISTORY_MINUTES)) -> Response:
     # Samples are already validated models; dumping them directly skips FastAPI's
     # response re-validation, which costs ~2 s of CPU for a full 24 h on the Pi.
-    body = HISTORY_JSON.dump_json(_monitor().history_since(minutes * 60))
-    return Response(body, media_type="application/json")
+    monitor = _monitor()
+    seconds = min(minutes * 60, monitor.settings.history_days * 86400)
+    if seconds <= monitor.memory_window_s:
+        body = HISTORY_RAW_JSON.dump_json(monitor.history_since(seconds))
+        bucket = monitor.settings.chrony_interval
+    else:
+        bucket, points = await monitor.history_buckets(seconds)
+        body = HISTORY_BUCKET_JSON.dump_json(points)
+    return Response(body, media_type="application/json", headers={"X-History-Bucket-Seconds": f"{bucket:g}"})
 
 
 @app.get(

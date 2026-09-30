@@ -10,10 +10,13 @@ from . import system
 from .chrony import ChronyMonitor
 from .config import Settings
 from .gpsd import GpsdClient
-from .models import HistorySample, Status
-from .store import HistoryStore
+from .models import HistoryPoint, HistorySample, Status
+from .store import HistoryStore, bucket_samples
 
 log = logging.getLogger(__name__)
+
+MAX_POINTS = 1500
+BUCKETS_S = (30, 60, 120, 300, 600, 900, 1800, 3600, 7200)
 
 
 class Monitor:
@@ -25,11 +28,13 @@ class Monitor:
         self.history: deque[HistorySample] = deque(maxlen=maxlen)
         self._unsaved: list[HistorySample] = []
         self._flush_lock = asyncio.Lock()
+        # Finished (fully flushed) buckets never change: bucket size -> {bucket index: point}.
+        self._bucket_cache: dict[float, dict[int, HistoryPoint]] = {}
         self.store: HistoryStore | None = None
         if settings.history_db:
             try:
-                self.store = HistoryStore(settings.history_db, settings.history_hours * 3600)
-                self.history.extend(self.store.load())
+                self.store = HistoryStore(settings.history_db, settings.history_days * 86400)
+                self.history.extend(self.store.load(time.time() - settings.history_hours * 3600))
                 log.info("loaded %d history samples from %s", len(self.history), settings.history_db)
             except (sqlite3.Error, OSError) as e:
                 log.error("history store %s unusable, keeping history in memory only: %s", settings.history_db, e)
@@ -91,6 +96,35 @@ class Monitor:
     def history_since(self, seconds: float) -> list[HistorySample]:
         cutoff = time.time() - seconds
         return [s for s in self.history if s.t >= cutoff]
+
+    @property
+    def memory_window_s(self) -> float:
+        return self.settings.history_hours * 3600
+
+    async def history_buckets(self, seconds: float) -> tuple[float, list[HistoryPoint]]:
+        """Bucket averages over the last `seconds` from SQLite plus unflushed samples."""
+        bucket = next((b for b in BUCKETS_S if seconds / b <= MAX_POINTS), BUCKETS_S[-1])
+        since = time.time() - seconds
+        if self.store is None:
+            return bucket, bucket_samples(self.history_since(seconds), bucket)
+        cache = self._bucket_cache.setdefault(bucket, {})
+        # Hold the flush lock so a batch in flight is either in the DB or still unsaved.
+        async with self._flush_lock:
+            first_unsaved = self._unsaved[0].t if self._unsaved else time.time()
+            done = int(first_unsaved // bucket)   # buckets before this one are fully in the DB
+            first = int(since // bucket)
+            # Query only what isn't cached, unless this range reaches further back than the cache.
+            start = first if not cache or min(cache) > first else max(cache) + 1
+            if start < done:
+                for point in await asyncio.to_thread(self.store.buckets, start * bucket, done * bucket, bucket):
+                    cache[int(point.t // bucket)] = point
+        expired = int((time.time() - self.settings.history_days * 86400) // bucket)
+        for k in [k for k in cache if k < expired]:
+            del cache[k]
+        # Unfinished buckets come from the in-memory raw samples (the last 24 h), flushed or not.
+        tail_start = max(since, done * bucket)
+        tail = bucket_samples([s for s in self.history if s.t >= tail_start], bucket)
+        return bucket, [p for k, p in sorted(cache.items()) if first <= k < done] + tail
 
     def snapshot(self) -> Status:
         return Status(

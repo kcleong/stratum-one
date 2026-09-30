@@ -199,6 +199,19 @@ class HistorySample(BaseModel):
     cpu_temp_c: float | None
 
 
+class HistoryPoint(HistorySample):
+    """A raw sample (ranges up to 24 h) or a bucket average (longer ranges).
+
+    For bucket averages `t` is the bucket centre, the other fields are means,
+    and the offset min/max fields bound what the mean hides.
+    """
+
+    system_time_offset_min_s: float | None = None
+    system_time_offset_max_s: float | None = None
+    pps_offset_min_s: float | None = None
+    pps_offset_max_s: float | None = None
+
+
 class Health(BaseModel):
     gpsd: bool
     chrony: bool
