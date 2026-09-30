@@ -22,7 +22,11 @@ async def lifespan(app: FastAPI):
     settings = load_settings()
     monitor = Monitor(settings)
     app.state.monitor = monitor
-    tasks = [asyncio.create_task(monitor.gps.run()), asyncio.create_task(monitor.run_chrony())]
+    tasks = [
+        asyncio.create_task(monitor.gps.run()),
+        asyncio.create_task(monitor.run_chrony()),
+        asyncio.create_task(monitor.run_flush()),
+    ]
     if settings.mqtt_host:
         tasks.append(asyncio.create_task(MqttPublisher(settings, monitor).run()))
     else:
@@ -31,6 +35,8 @@ async def lifespan(app: FastAPI):
     for task in tasks:
         task.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
+    await monitor.flush()   # keep everything since the last flush across restarts
+    monitor.close()
 
 
 app = FastAPI(title="stratum_one", summary="GPS and NTP stats for the stratum-1 server", lifespan=lifespan)

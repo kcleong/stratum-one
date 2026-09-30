@@ -11,7 +11,8 @@ RUN npm run build
 # --- API ---
 FROM ghcr.io/astral-sh/uv:python3.14-alpine
 # chronyc talks to chronyd over the shared /run/chrony socket.
-RUN apk add --no-cache chrony
+RUN apk add --no-cache chrony \
+    && mkdir /data && chown 100:101 /data   # history.db volume; api runs as 100:101
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0 \
     PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH=/app/.venv/bin:$PATH
 WORKDIR /app

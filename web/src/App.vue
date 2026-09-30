@@ -193,7 +193,7 @@ const systemInfo = computed<[string, string][]>(() => {
       >
         {{ r.label }}
       </button>
-      <span class="sub">{{ samples.length }} samples · kept in memory for 24 h</span>
+      <span class="sub">{{ samples.length }} samples · last 24 h kept</span>
     </div>
 
     <section class="charts">
