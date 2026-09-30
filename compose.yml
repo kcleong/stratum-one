@@ -37,7 +37,9 @@ services:
     restart: unless-stopped
 
   api:
-    build: ./api
+    build:
+      context: .                     # needs web/ for the UI stage
+      dockerfile: api/Dockerfile
     network_mode: host               # reaches gpsd on 127.0.0.1:2947; serves :8000
     user: "100:101"                  # chrony uid/gid in the chrony image: may use chronyd.sock
     env_file:

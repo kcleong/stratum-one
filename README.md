@@ -99,6 +99,9 @@ Then `docker compose restart chrony`.
 
 The `api` service (FastAPI, `api/`) serves GPS and chrony stats on port 8000
 and optionally publishes them to MQTT with Home Assistant discovery.
+Python 3.14, dependencies in `api/pyproject.toml` locked with uv
+(`api/uv.lock`); the image is built on `ghcr.io/astral-sh/uv:python3.14-alpine`.
+After changing dependencies run `uv lock` in `api/`.
 
 - Interactive docs: `http://lobsang.local:8000/docs` (OpenAPI at `/openapi.json`)
 - `GET /api/status`: everything below in one document
@@ -120,6 +123,25 @@ chronyc reaches chronyd over `/run/chrony/chronyd.sock`, shared through the
 
 The API has no authentication and shows the GPS position and NTP client
 addresses; keep port 8000 on the LAN.
+
+### Dashboard
+
+`http://lobsang.local:8000/`: live UTC clock, lock/fix status, offsets,
+frequency, satellite history charts (15 min to 24 h, scroll to zoom), sky
+plot, signal strength per satellite, chrony sources, NTP clients and host
+stats. Vue 3 + ECharts in `web/`, built into the api image by the first
+stage of `api/Dockerfile` (no Node needed on the host).
+
+Develop on another machine with the API still on the Pi:
+
+```
+cd web
+npm install
+npm run dev            # http://localhost:5173, proxies /api to lobsang.local:8000
+npm run gen:api        # regenerate src/api/schema.d.ts after API model changes
+```
+
+Set `API_TARGET=http://<ip>:8000` if `lobsang.local` doesn't resolve.
 
 ### MQTT
 
