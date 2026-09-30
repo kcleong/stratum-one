@@ -21,6 +21,7 @@ const rows = computed(() => {
 
 // reach is the last 8 polls, oldest bit first.
 const bits = (reach: number) => Array.from({ length: 8 }, (_, i) => (reach >> (7 - i)) & 1)
+const answered = (reach: number) => bits(reach).reduce((a, b) => a + b, 0)
 </script>
 
 <template>
@@ -32,7 +33,7 @@ const bits = (reach: number) => Array.from({ length: 8 }, (_, i) => (reach >> (7
           <th>Source</th>
           <th class="r">Stratum</th>
           <th class="r">Poll</th>
-          <th>Reach</th>
+          <th title="Answers to the last 8 polls">Reach</th>
           <th class="r">Last</th>
           <th class="r">Offset</th>
           <th class="r">± error</th>
@@ -52,8 +53,9 @@ const bits = (reach: number) => Array.from({ length: 8 }, (_, i) => (reach >> (7
           <td class="r">{{ s.stratum }}</td>
           <td class="r">{{ fmtLog2(s.poll) }}</td>
           <td>
-            <span class="reach" :title="`reach ${s.reach.toString(8)} (octal)`">
+            <span class="reach" :title="`Last 8 polls, oldest first: ${answered(s.reach)} answered (reach ${s.reach.toString(8)} octal)`">
               <i v-for="(b, i) in bits(s.reach)" :key="i" :class="{ on: b }" />
+              <span class="reach-count num" :class="{ miss: answered(s.reach) < 8 }">{{ answered(s.reach) }}/8</span>
             </span>
           </td>
           <td class="r">{{ fmtAgo(s.last_rx_s) }}</td>
@@ -89,13 +91,27 @@ const bits = (reach: number) => Array.from({ length: 8 }, (_, i) => (reach >> (7
   gap: 2px;
   vertical-align: middle;
 }
+.reach {
+  align-items: center;
+}
+/* answered poll: solid; missed poll: hollow outline, so gaps stand out */
 .reach i {
   width: 6px;
   height: 12px;
   border-radius: 2px;
-  background: var(--grid);
+  box-shadow: inset 0 0 0 1px var(--muted);
 }
 .reach i.on {
   background: var(--ink-2);
+  box-shadow: none;
+}
+.reach-count {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.reach-count.miss {
+  color: var(--ink);
+  font-weight: 600;
 }
 </style>
