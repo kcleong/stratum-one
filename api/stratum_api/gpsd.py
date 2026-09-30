@@ -22,8 +22,12 @@ class GpsdClient:
         self.version: str | None = None
         self.device: dict = {}
         self.tpv: dict = {}
-        self.sky: dict = {}          # DOPs and counts, merged from partial SKY reports
-        self.satellites: list = []   # from the last SKY report that listed them
+        self.sky: dict = {}          # DOPs, merged from SKY reports
+        self.satellites: list = []   # complete satellite list of the last finished epoch
+        # gpsd sends several SKY lists per second, growing as each constellation's GSV/GSA
+        # arrives; only the last one of an epoch is complete. Hold it until the epoch ends.
+        self._pending: tuple[str | None, list] | None = None
+        self._receiver_dops = False   # seen DOPs reported by the receiver itself
         self.last_message: float | None = None
 
     async def run(self) -> None:
@@ -62,10 +66,21 @@ class GpsdClient:
         match msg.get("class"):
             case "TPV":
                 self.tpv = msg
+                self._commit_pending()   # TPV follows the epoch's last SKY list
             case "SKY":
                 if "satellites" in msg:
-                    self.satellites = msg["satellites"]
-                self.sky.update({k: v for k, v in msg.items() if k != "satellites"})
+                    if self._pending and self._pending[0] != msg.get("time"):
+                        self._commit_pending()   # a new epoch started without a TPV
+                    self._pending = (msg.get("time"), msg["satellites"])
+                # uSat/nSat in SKY reports without a list come from a single talker's
+                # GSA (e.g. 6 while 18 are used), so counts are taken from the list instead.
+                # DOPs: reports without a list carry the receiver's own (as in GGA/GSA);
+                # list reports carry gpsd's recomputation, used only if the receiver sends none.
+                if "satellites" not in msg:
+                    self._receiver_dops = True
+                elif self._receiver_dops:
+                    return
+                self.sky.update({k: v for k, v in msg.items() if k not in ("satellites", "uSat", "nSat")})
             case "DEVICES":
                 if msg.get("devices"):
                     self.device = msg["devices"][0]
@@ -73,6 +88,11 @@ class GpsdClient:
                 self.device = msg
             case "VERSION":
                 self.version = msg.get("release")
+
+    def _commit_pending(self) -> None:
+        if self._pending:
+            self.satellites = self._pending[1]
+            self._pending = None
 
     def snapshot(self) -> GpsStatus:
         tpv, sky = self.tpv, self.sky
@@ -112,8 +132,8 @@ class GpsdClient:
                 speed_mps=tpv.get("speed"),
             ),
             dop=Dop.model_validate(sky),
-            satellites_visible=sky.get("nSat", len(sats)),
-            satellites_used=sky.get("uSat", sum(s.used for s in sats)),
+            satellites_visible=len(sats),
+            satellites_used=sum(s.used for s in sats),
             constellations=constellations,
             satellites=sats,
         )
