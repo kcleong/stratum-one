@@ -1,0 +1,19 @@
+# Secrets (MQTT credentials)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Web UI build (future)
+node_modules/
+dist/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

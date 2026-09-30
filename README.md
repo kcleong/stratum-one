@@ -1,6 +1,6 @@
 # stratum_one
 
-GPS + PPS disciplined stratum-1 NTP server on a Raspberry Pi 4 (`berry-well`),
+GPS + PPS disciplined stratum-1 NTP server on a Raspberry Pi 4 (`lobsang`),
 run with Docker Compose.
 
 - **gpsd** reads NMEA from the GPS over UART (`/dev/ttyAMA2`) and publishes
@@ -37,7 +37,7 @@ Give the antenna a clear sky view; first fix can take several minutes.
    dtoverlay=uart2
    dtoverlay=pps-gpio,gpiopin=18
    ```
-   (`enable_uart=1` and `uart2` are already present on berry-well.)
+   (`enable_uart=1` and `uart2` are already present on lobsang.)
 
 2. **No serial console** on the GPS UART: `/boot/firmware/cmdline.txt` must
    not contain `console=serial0,...` or `console=ttyAMA2,...`.
@@ -95,13 +95,51 @@ fix, look at the `GPS` line in `chronyc sourcestats` (Offset column) and
 set `offset` in `chrony.conf` so the GPS offset is near 0 relative to PPS.
 Then `docker compose restart chrony`.
 
+## Stats API and Home Assistant
+
+The `api` service (FastAPI, `api/`) serves GPS and chrony stats on port 8000
+and optionally publishes them to MQTT with Home Assistant discovery.
+
+- Interactive docs: `http://lobsang.local:8000/docs` (OpenAPI at `/openapi.json`)
+- `GET /api/status`: everything below in one document
+- `GET /api/gps`, `/api/gps/satellites`: fix, DOPs, per-satellite az/el/SNR
+- `GET /api/chrony`, `/api/chrony/clients`: tracking, sources, sourcestats,
+  serverstats, clients
+- `GET /api/system`: CPU temperature, load, uptime, memory
+- `GET /api/history?minutes=60`: offsets, frequency, satellites and
+  temperature every 5 s, last 24 h in memory (lost on restart)
+- `WS /api/ws?interval=1`: pushes `/api/status` every second
+- `GET /healthz`: 503 when gpsd or chronyd is unreachable
+
+Offsets are in seconds. `system_time_offset_s` is positive when the clock is
+ahead; `frequency_ppm` is positive when the local oscillator runs fast.
+
+chronyc reaches chronyd over `/run/chrony/chronyd.sock`, shared through the
+`chrony-run` tmpfs volume. The api container runs as chrony's uid/gid
+(100:101), read-only and without capabilities.
+
+The API has no authentication and shows the GPS position and NTP client
+addresses; keep port 8000 on the LAN.
+
+### MQTT
+
+```
+cp .env.example .env   # set MQTT_HOST (an IP), MQTT_USER, MQTT_PASSWORD
+docker compose up -d api
+```
+
+The device `lobsang` appears in Home Assistant under MQTT with sensors for
+fix, satellites, stratum, offsets (µs), frequency, NTP clients and CPU
+temperature, plus "PPS locked". State is published every 10 s to
+`stratum_one/lobsang/state`; discovery is resent when HA restarts.
+
 ## Clients
 
 Point clients at the Pi, e.g. for chrony:
 ```
-server berry-well.local iburst prefer
+server lobsang.local iburst prefer
 ```
-or for systemd-timesyncd (`/etc/systemd/timesyncd.conf`): `NTP=berry-well.local`.
+or for systemd-timesyncd (`/etc/systemd/timesyncd.conf`): `NTP=lobsang.local`.
 
 Adjust the `allow` lines in `chrony.conf` to your LAN ranges.
 
