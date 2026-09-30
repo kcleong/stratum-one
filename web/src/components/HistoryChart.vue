@@ -9,7 +9,11 @@ export interface Series {
   data: [number, number | null][] // [ms, value]
   dashed?: boolean
   step?: boolean
+  /** min/max per point (bucket-averaged ranges), drawn as a shaded band behind the line */
+  band?: { min: (number | null)[]; max: (number | null)[] }
 }
+
+type Rendered = { kind: 'line' | 'band-base' | 'band-range'; s: Series }
 
 const props = defineProps<{
   title: string
@@ -28,6 +32,10 @@ const option = computed(() => {
   const fmt = (v: number) => (v == null ? '–' : `${v.toFixed(digits)} ${props.unit}`)
   const color = (s: Series) => (s.slot ? t.series(s.slot) : t.muted)
   const multi = props.series.length > 1
+  const rendered: Rendered[] = props.series.flatMap((s) => [
+    ...(s.band ? [{ kind: 'band-base', s } as Rendered, { kind: 'band-range', s } as Rendered] : []),
+    { kind: 'line', s } as Rendered,
+  ])
   return {
     animation: false,
     grid: { left: 8, right: 12, top: multi ? 30 : 10, bottom: 4 },
@@ -48,14 +56,19 @@ const option = computed(() => {
       backgroundColor: t.surface,
       borderColor: t.grid,
       textStyle: { color: t.ink, fontSize: 12 },
-      formatter: (items: { seriesIndex: number; value: [number, number | null] }[]) => {
-        if (!items.length) return ''
-        const time = new Date(items[0].value[0]).toLocaleTimeString(undefined, { hour12: false })
-        const rows = items
+      formatter: (items: { seriesIndex: number; dataIndex: number; value: [number, number | null] }[]) => {
+        const lines = items.filter((it) => rendered[it.seriesIndex]?.kind === 'line')
+        if (!lines.length) return ''
+        const when = new Date(lines[0].value[0])
+        const time = when.toLocaleString(undefined, { hour12: false, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        const rows = lines
           .map((it) => {
-            const s = props.series[it.seriesIndex]
+            const s = rendered[it.seriesIndex].s
             const key = `<span style="display:inline-block;width:12px;height:2px;background:${color(s)};vertical-align:middle;margin-right:6px"></span>`
-            return `<div>${key}<b>${fmt(it.value[1] as number)}</b> <span style="color:${t.ink2}">${s.name}</span></div>`
+            const lo = s.band?.min[it.dataIndex]
+            const hi = s.band?.max[it.dataIndex]
+            const range = lo != null && hi != null ? ` <span style="color:${t.muted}">${fmt(lo)} … ${fmt(hi)}</span>` : ''
+            return `<div>${key}<b>${fmt(it.value[1] as number)}</b> <span style="color:${t.ink2}">${s.name}</span>${range}</div>`
           })
           .join('')
         return `<div style="color:${t.muted};margin-bottom:2px">${time}</div>${rows}`
@@ -75,17 +88,42 @@ const option = computed(() => {
       splitLine: { lineStyle: { color: t.grid } },
     },
     dataZoom: [{ type: 'inside', filterMode: 'none' }],
-    series: props.series.map((s) => ({
-      type: 'line',
-      name: s.name,
-      data: s.data,
-      step: s.step ? 'end' : false,
-      showSymbol: false,
-      sampling: 'lttb',
-      lineStyle: { width: 2, color: color(s), type: s.dashed ? 'dashed' : 'solid' },
-      itemStyle: { color: color(s) },
-      emphasis: { disabled: true },
-    })),
+    series: rendered.map(({ kind, s }, i) => {
+      if (kind === 'line')
+        return {
+          type: 'line',
+          name: s.name,
+          data: s.data,
+          step: s.step ? 'end' : false,
+          showSymbol: false,
+          sampling: 'lttb',
+          lineStyle: { width: 2, color: color(s), type: s.dashed ? 'dashed' : 'solid' },
+          itemStyle: { color: color(s) },
+          emphasis: { disabled: true },
+          z: 3,
+        }
+      // Band = invisible base at min, stacked with (max - min) filled on top.
+      const band = s.band!
+      const stack = `band-${i - (kind === 'band-range' ? 1 : 0)}`
+      const data =
+        kind === 'band-base'
+          ? s.data.map(([x], j) => [x, band.min[j]])
+          : s.data.map(([x], j) => [x, band.max[j] != null && band.min[j] != null ? band.max[j]! - band.min[j]! : null])
+      return {
+        type: 'line',
+        name: `${s.name} range`,
+        data,
+        stack,
+        stackStrategy: 'all', // base can be negative; stack the range on it regardless of sign
+        showSymbol: false,
+        silent: true,
+        lineStyle: { opacity: 0 },
+        areaStyle: kind === 'band-range' ? { color: color(s), opacity: 0.18 } : undefined,
+        emphasis: { disabled: true },
+        tooltip: { show: false },
+        z: 1,
+      }
+    }),
   }
 })
 </script>

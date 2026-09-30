@@ -110,7 +110,8 @@ After changing dependencies run `uv lock` in `api/`.
   serverstats, clients
 - `GET /api/system`: CPU temperature, load, uptime, memory
 - `GET /api/history?minutes=60`: offsets, frequency, satellites and
-  temperature every 5 s, last 24 h (see History below)
+  temperature; raw 5 s samples up to 24 h, bucket averages with offset
+  min/max up to 30 days (see History below)
 - `WS /api/ws?interval=1`: pushes `/api/status` every second
 - `GET /healthz`: 503 when gpsd or chronyd is unreachable
 
@@ -121,10 +122,14 @@ chronyc reaches chronyd over `/run/chrony/chronyd.sock`, shared through the
 `chrony-run` tmpfs volume. The api container runs as chrony's uid/gid
 (100:101), read-only and without capabilities.
 
-**History** is kept in memory and saved to SQLite (`api-data` volume,
+**History**: the last `HISTORY_HOURS` (24) are kept in memory at full 5 s
+resolution; everything is saved to SQLite (`api-data` volume,
 `/data/history.db`) in one transaction every `HISTORY_FLUSH_MINUTES` (15) and
 on shutdown, so restarts and deploys keep it; a power cut loses at most one
-interval. That is about 5 MiB of SD card writes per day. Long-term history
+interval. Rows older than `HISTORY_DAYS` (30) are pruned, so the database
+levels off at ~45 MiB and does not grow further; writes are ~5 MiB/day
+regardless of retention. Ranges over 24 h are served as ≤ ~1500 bucket
+averages with offset min/max (finished buckets are cached). Long-term history
 lives in Home Assistant's recorder via MQTT.
 
 The API has no authentication and shows the GPS position and NTP client

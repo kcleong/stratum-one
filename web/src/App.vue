@@ -21,13 +21,14 @@ connect('history') // shared crosshair and zoom across the history charts
 
 const { status, connected, clockDelta } = useLiveStatus()
 const RANGES = [
-  { label: '15 min', minutes: 15 },
   { label: '1 h', minutes: 60 },
   { label: '6 h', minutes: 360 },
   { label: '24 h', minutes: 1440 },
+  { label: '7 d', minutes: 7 * 1440 },
+  { label: '30 d', minutes: 30 * 1440 },
 ]
 const minutes = ref(60)
-const { samples, loading } = useHistory(minutes)
+const { samples, bucketSeconds, loading } = useHistory(minutes)
 const { clients } = useClients()
 
 const gps = computed(() => status.value?.gps)
@@ -102,14 +103,28 @@ const tiles = computed(() => {
   ]
 })
 
-const us = (v: number | null) => (v == null ? null : v * 1e6)
+const us = (v: number | null | undefined) => (v == null ? null : v * 1e6)
 const hist = computed(() => {
   const h = samples.value
   const at = <T,>(f: (s: (typeof h)[number]) => T) => h.map((s) => [s.t * 1000, f(s)] as [number, T])
+  // Bucket-averaged ranges carry min/max per bucket: show them as a band so spikes stay visible.
+  const bucketed = h.some((s) => s.system_time_offset_min_s != null)
+  const band = (lo: (s: (typeof h)[number]) => number | null | undefined, hi: typeof lo) =>
+    bucketed ? { min: h.map((s) => us(lo(s))), max: h.map((s) => us(hi(s))) } : undefined
   return {
     offset: [
-      { name: 'System offset', slot: 1, data: at((s) => us(s.system_time_offset_s)) },
-      { name: 'PPS offset', slot: 2, data: at((s) => us(s.pps_offset_s)) },
+      {
+        name: 'System offset',
+        slot: 1,
+        data: at((s) => us(s.system_time_offset_s)),
+        band: band((s) => s.system_time_offset_min_s, (s) => s.system_time_offset_max_s),
+      },
+      {
+        name: 'PPS offset',
+        slot: 2,
+        data: at((s) => us(s.pps_offset_s)),
+        band: band((s) => s.pps_offset_min_s, (s) => s.pps_offset_max_s),
+      },
     ] as Series[],
     frequency: [{ name: 'Frequency', slot: 1, data: at((s) => s.frequency_ppm) }] as Series[],
     satellites: [
@@ -118,6 +133,13 @@ const hist = computed(() => {
     ] as Series[],
     temperature: [{ name: 'CPU temperature', slot: 1, data: at((s) => s.cpu_temp_c) }] as Series[],
   }
+})
+
+const resolution = computed(() => {
+  const b = bucketSeconds.value
+  if (b <= 5) return 'every 5 s'
+  const label = b < 3600 ? `${b / 60} min` : `${b / 3600} h`
+  return `${label} averages, band = min…max`
 })
 
 const serverStats = computed<[string, string][]>(() => {
@@ -193,7 +215,7 @@ const systemInfo = computed<[string, string][]>(() => {
       >
         {{ r.label }}
       </button>
-      <span class="sub">{{ samples.length }} samples · last 24 h kept</span>
+      <span class="sub">{{ samples.length }} points · {{ resolution }}</span>
     </div>
 
     <section class="charts">
