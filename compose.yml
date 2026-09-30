@@ -16,6 +16,7 @@ services:
     volumes:
       - ./chrony.conf:/etc/chrony/chrony.conf:ro
       - chrony-state:/var/lib/chrony # drift file survives restarts
+      - chrony-run:/run/chrony       # chronyd.sock, shared with api
     tmpfs:
       - /run
     mem_limit: 128m
@@ -35,5 +36,27 @@ services:
     mem_limit: 64m
     restart: unless-stopped
 
+  api:
+    build: ./api
+    network_mode: host               # reaches gpsd on 127.0.0.1:2947; serves :8000
+    user: "100:101"                  # chrony uid/gid in the chrony image: may use chronyd.sock
+    env_file:
+      - path: .env                   # MQTT_HOST, MQTT_USER, MQTT_PASSWORD, ... (see .env.example)
+        required: false
+    volumes:
+      - chrony-run:/run/chrony
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on: [chrony, gpsd]
+    cpus: 0.5                        # never compete with chronyd
+    mem_limit: 128m
+    restart: unless-stopped
+
 volumes:
   chrony-state:
+  chrony-run:                        # tmpfs: socket only, keep it off the SD card
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: uid=100,gid=101,mode=0750

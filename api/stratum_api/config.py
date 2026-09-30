@@ -1,0 +1,43 @@
+import os
+import socket
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Settings:
+    api_host: str
+    api_port: int
+    log_level: str
+    gpsd_host: str
+    gpsd_port: int
+    chrony_interval: float     # seconds between chronyc polls (also history resolution)
+    history_hours: float
+    node_id: str               # device name in HA and MQTT topics
+    mqtt_host: str | None      # MQTT disabled when unset
+    mqtt_port: int
+    mqtt_user: str | None
+    mqtt_password: str | None
+    mqtt_interval: float
+    mqtt_topic_prefix: str
+    ha_discovery_prefix: str
+
+
+def load_settings() -> Settings:
+    env = os.environ.get
+    return Settings(
+        api_host=env("API_HOST", "0.0.0.0"),
+        api_port=int(env("API_PORT", "8000")),
+        log_level=env("LOG_LEVEL", "INFO").upper(),
+        gpsd_host=env("GPSD_HOST", "127.0.0.1"),
+        gpsd_port=int(env("GPSD_PORT", "2947")),
+        chrony_interval=float(env("CHRONY_INTERVAL", "5")),
+        history_hours=float(env("HISTORY_HOURS", "24")),
+        node_id=env("NODE_ID") or socket.gethostname(),
+        mqtt_host=env("MQTT_HOST") or None,
+        mqtt_port=int(env("MQTT_PORT", "1883")),
+        mqtt_user=env("MQTT_USER") or None,
+        mqtt_password=env("MQTT_PASSWORD") or None,
+        mqtt_interval=float(env("MQTT_INTERVAL", "10")),
+        mqtt_topic_prefix=env("MQTT_TOPIC_PREFIX", "stratum_one"),
+        ha_discovery_prefix=env("HA_DISCOVERY_PREFIX", "homeassistant"),
+    )
