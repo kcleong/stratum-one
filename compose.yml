@@ -47,6 +47,7 @@ services:
         required: false
     volumes:
       - chrony-run:/run/chrony
+      - api-data:/data               # history.db, written in batches (HISTORY_FLUSH_MINUTES)
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -57,6 +58,7 @@ services:
 
 volumes:
   chrony-state:
+  api-data:
   chrony-run:                        # tmpfs: socket only, keep it off the SD card
     driver_opts:
       type: tmpfs
