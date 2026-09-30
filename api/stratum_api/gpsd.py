@@ -5,6 +5,8 @@ import json
 import logging
 import time
 
+from .models import ConstellationCount, Dop, GpsDevice, GpsFix, GpsStatus, Satellite
+
 log = logging.getLogger(__name__)
 
 WATCH = b'?WATCH={"enable":true,"json":true};\n'
@@ -72,46 +74,46 @@ class GpsdClient:
             case "VERSION":
                 self.version = msg.get("release")
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> GpsStatus:
         tpv, sky = self.tpv, self.sky
         sats = [
-            {
-                "prn": s.get("PRN"),
-                "gnss": GNSS.get(s.get("gnssid"), "unknown"),
-                "svid": s.get("svid"),
-                "azimuth": s.get("az"),
-                "elevation": s.get("el"),
-                "snr": s.get("ss"),
-                "used": bool(s.get("used")),
-            }
+            Satellite(
+                prn=s.get("PRN"),
+                gnss=GNSS.get(s.get("gnssid"), "unknown"),
+                svid=s.get("svid"),
+                azimuth=s.get("az"),
+                elevation=s.get("el"),
+                snr=s.get("ss"),
+                used=bool(s.get("used")),
+            )
             for s in self.satellites
         ]
-        constellations: dict[str, dict] = {}
+        constellations: dict[str, ConstellationCount] = {}
         for s in sats:
-            c = constellations.setdefault(s["gnss"], {"visible": 0, "used": 0})
-            c["visible"] += 1
-            c["used"] += s["used"]
-        return {
-            "connected": self.connected,
-            "age_s": round(time.time() - self.last_message, 1) if self.last_message else None,
-            "gpsd_version": self.version,
-            "device": {k: self.device.get(k) for k in ("path", "driver", "subtype", "subtype1", "bps")},
-            "fix": {
-                "mode": FIX_MODES.get(tpv.get("mode", 0), "unknown"),
-                "time": tpv.get("time"),
-                "leapseconds": tpv.get("leapseconds"),
-                "lat": tpv.get("lat"),
-                "lon": tpv.get("lon"),
-                "alt_msl_m": tpv.get("altMSL"),
-                "alt_hae_m": tpv.get("altHAE"),
-                "eph_m": tpv.get("eph"),
-                "epv_m": tpv.get("epv"),
-                "ept_s": tpv.get("ept"),
-                "speed_mps": tpv.get("speed"),
-            },
-            "dop": {k: sky.get(k) for k in ("gdop", "pdop", "hdop", "vdop", "tdop")},
-            "satellites_visible": sky.get("nSat", len(sats)),
-            "satellites_used": sky.get("uSat", sum(s["used"] for s in sats)),
-            "constellations": constellations,
-            "satellites": sats,
-        }
+            c = constellations.setdefault(s.gnss, ConstellationCount(visible=0, used=0))
+            c.visible += 1
+            c.used += s.used
+        return GpsStatus(
+            connected=self.connected,
+            age_s=round(time.time() - self.last_message, 1) if self.last_message else None,
+            gpsd_version=self.version,
+            device=GpsDevice.model_validate(self.device),
+            fix=GpsFix(
+                mode=FIX_MODES.get(tpv.get("mode", 0), "unknown"),
+                time=tpv.get("time"),
+                leapseconds=tpv.get("leapseconds"),
+                lat=tpv.get("lat"),
+                lon=tpv.get("lon"),
+                alt_msl_m=tpv.get("altMSL"),
+                alt_hae_m=tpv.get("altHAE"),
+                eph_m=tpv.get("eph"),
+                epv_m=tpv.get("epv"),
+                ept_s=tpv.get("ept"),
+                speed_mps=tpv.get("speed"),
+            ),
+            dop=Dop.model_validate(sky),
+            satellites_visible=sky.get("nSat", len(sats)),
+            satellites_used=sky.get("uSat", sum(s.used for s in sats)),
+            constellations=constellations,
+            satellites=sats,
+        )
