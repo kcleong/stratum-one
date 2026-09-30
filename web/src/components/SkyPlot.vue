@@ -74,6 +74,7 @@ const option = computed(() => {
           fontSize: 10,
           formatter: (p: { data: { sat: Satellite } }) => satLabel(p.data.sat.gnss, p.data.sat.svid, p.data.sat.prn),
         },
+        labelLayout: { hideOverlap: true }, // hidden labels stay in the tooltip and table
         emphasis: { scale: 1.4 },
       }
     }),
@@ -87,8 +88,8 @@ const option = computed(() => {
 
 <style scoped>
 .sky {
+  /* Explicit height: aspect-ratio let the canvas outgrow the card on phones. */
   width: 100%;
-  aspect-ratio: 1;
-  max-height: 380px;
+  height: clamp(260px, calc(100vw - 64px), 380px);
 }
 </style>

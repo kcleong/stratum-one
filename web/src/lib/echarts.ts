@@ -8,6 +8,7 @@ import {
   TooltipComponent,
 } from 'echarts/components'
 import { use } from 'echarts/core'
+import { LabelLayout } from 'echarts/features'
 import { CanvasRenderer } from 'echarts/renderers'
 
 use([
@@ -19,5 +20,6 @@ use([
   LegendComponent,
   PolarComponent,
   TooltipComponent,
+  LabelLayout, // needed for labelLayout.hideOverlap
   CanvasRenderer,
 ])
