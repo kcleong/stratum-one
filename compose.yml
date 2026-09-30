@@ -51,8 +51,8 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     depends_on: [chrony, gpsd]
-    cpus: 0.5                        # never compete with chronyd
-    mem_limit: 128m
+    cpus: 1.0                        # runaway guard; chronyd runs at RT priority anyway
+    mem_limit: 192m                  # ~60 MiB with 24 h history + headroom for requests
     restart: unless-stopped
 
 volumes:

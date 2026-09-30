@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Query, Response, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
+from pydantic import TypeAdapter
 
 from .config import load_settings
 from .models import ChronyStatus, Client, GpsStatus, Health, HistorySample, Satellite, Status, SystemStatus
@@ -12,7 +13,8 @@ from .monitor import Monitor
 from .mqtt import MqttPublisher
 
 log = logging.getLogger(__name__)
-STATIC_DIR = Path(__file__).parent.parent / "static"   # web UI, once it exists
+HISTORY_JSON = TypeAdapter(list[HistorySample])
+STATIC_DIR = Path(__file__).parent.parent / "static"   # web UI, built by the Dockerfile web stage
 
 
 @contextlib.asynccontextmanager
@@ -68,9 +70,16 @@ def system() -> SystemStatus:
     return _monitor().snapshot().system
 
 
-@app.get("/api/history", summary="Time series of offsets, frequency, satellites and temperature")
-def history(minutes: float = Query(60, gt=0, le=24 * 60)) -> list[HistorySample]:
-    return _monitor().history_since(minutes * 60)
+@app.get(
+    "/api/history",
+    summary="Time series of offsets, frequency, satellites and temperature",
+    response_model=list[HistorySample],
+)
+def history(minutes: float = Query(60, gt=0, le=24 * 60)) -> Response:
+    # Samples are already validated models; dumping them directly skips FastAPI's
+    # response re-validation, which costs ~2 s of CPU for a full 24 h on the Pi.
+    body = HISTORY_JSON.dump_json(_monitor().history_since(minutes * 60))
+    return Response(body, media_type="application/json")
 
 
 @app.get(
