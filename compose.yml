@@ -3,8 +3,8 @@ services:
   chrony:
     build:
       dockerfile_inline: |
-        FROM alpine:3.22
-        RUN apk add --no-cache chrony ca-certificates
+        FROM alpine:3.24
+        RUN apk add --no-cache chrony-nts ca-certificates   # 3.24+: plain chrony is built without NTS
     command: chronyd -d -f /etc/chrony/chrony.conf
     network_mode: host               # UDP 123 without NAT; real client IPs
     ipc: shareable                   # gpsd writes NMEA time into SHM
@@ -31,7 +31,7 @@ services:
   gpsd:
     build:
       dockerfile_inline: |
-        FROM alpine:3.22
+        FROM alpine:3.24
         RUN apk add --no-cache gpsd
     command: gpsd -N -n -G /dev/ttyAMA2
     network_mode: host               # cgps/gpsmon on host via localhost:2947
