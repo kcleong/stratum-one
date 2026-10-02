@@ -1,6 +1,7 @@
 """chronyd stats via `chronyc -c` (CSV output) over the shared /run/chrony socket."""
 
 import asyncio
+import ipaddress
 import logging
 import time
 
@@ -38,6 +39,7 @@ SERVERSTATS_FIELDS = (
 )
 UNSET_INTERVAL = 127        # clients: interval not known yet
 UNSET_LAST = 4294967295     # clients: never seen
+CLIENTS_TOP = 50            # busiest clients kept; a public pool server sees tens of thousands
 
 
 class ChronycError(Exception):
@@ -145,6 +147,9 @@ class ChronyMonitor:
         self.serverstats: ServerStats | None = None
         self.activity: Activity | None = None
         self.clients: list[Client] = []
+        self.client_count = 0
+        self.ntp_requests_per_s: float | None = None
+        self._last_rx: tuple[float, int] | None = None   # (monotonic time, ntp_packets_received)
         self.error: str | None = None
         self.updated: float | None = None
 
@@ -156,11 +161,10 @@ class ChronyMonitor:
             chronyc("-N", "sourcestats"),
             chronyc("serverstats"),
             chronyc("activity"),
-            chronyc("-n", "clients"),
             return_exceptions=True,
         )
         errors = [str(r) for r in results if isinstance(r, Exception)]
-        tracking, sources, sourcestats, serverstats, activity, clients = results
+        tracking, sources, sourcestats, serverstats, activity = results
         try:
             if not isinstance(tracking, Exception) and tracking:
                 self.tracking = parse_tracking(tracking[0])
@@ -170,10 +174,9 @@ class ChronyMonitor:
                 self.sourcestats = [parse_sourcestats(r) for r in sourcestats]
             if not isinstance(serverstats, Exception) and serverstats:
                 self.serverstats = parse_serverstats(serverstats[0])
+                self._update_rate(self.serverstats.ntp_packets_received)
             if not isinstance(activity, Exception) and activity:
                 self.activity = parse_activity(activity[0])
-            if not isinstance(clients, Exception):
-                self.clients = [parse_client(r) for r in clients]
         except (IndexError, ValueError) as e:
             errors.append(f"unexpected chronyc output: {e!r}")
         error = "; ".join(errors) or None
@@ -182,6 +185,30 @@ class ChronyMonitor:
         self.error = error
         if not errors:
             self.updated = time.time()
+
+    def _update_rate(self, received: int | None) -> None:
+        now = time.monotonic()
+        last, self._last_rx = self._last_rx, (now, received) if received is not None else None
+        # No rate on the first poll or after chronyd restarted (counter went back).
+        if last is None or received is None or received < last[1] or now <= last[0]:
+            self.ntp_requests_per_s = None
+        else:
+            self.ntp_requests_per_s = (received - last[1]) / (now - last[0])
+
+    async def poll_clients(self) -> None:
+        """The client log can hold tens of thousands of rows: polled slowly, only the busiest kept."""
+        try:
+            rows = await chronyc("-n", "clients", timeout=30.0)
+            clients = [parse_client(r) for r in rows]
+        except (ChronycError, IndexError, ValueError) as e:
+            log.warning("chrony clients: %s", e)
+            return
+        clients.sort(key=lambda c: c.ntp_packets, reverse=True)
+        top = clients[:CLIENTS_TOP]
+        # Always keep LAN clients visible, however quiet.
+        top += [c for c in clients[CLIENTS_TOP:] if _is_private(c.address)]
+        self.client_count = len(clients)
+        self.clients = top
 
     @property
     def selected_source(self) -> Source | None:
@@ -203,5 +230,13 @@ class ChronyMonitor:
             sourcestats=self.sourcestats,
             serverstats=self.serverstats,
             activity=self.activity,
-            client_count=len(self.clients),
+            client_count=self.client_count,
+            ntp_requests_per_s=self.ntp_requests_per_s,
         )
+
+
+def _is_private(address: str) -> bool:
+    try:
+        return ipaddress.ip_address(address).is_private
+    except ValueError:
+        return False

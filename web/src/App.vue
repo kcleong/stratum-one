@@ -98,7 +98,7 @@ const tiles = computed(() => {
     {
       label: 'NTP clients',
       value: fmtNum(chrony.value?.client_count),
-      sub: `${fmtNum(chrony.value?.serverstats?.ntp_packets_received)} requests`,
+      sub: `${fmtNum(chrony.value?.ntp_requests_per_s, 1)} req/s · ${fmtNum(chrony.value?.serverstats?.ntp_packets_received)} total`,
     },
     { label: 'CPU temperature', value: fmtNum(s?.cpu_temp_c, 1, ' °C'), sub: `load ${fmtNum(s?.load?.[0], 2)}` },
   ].map((tile) => ({ ...tile, info: INFO[tile.label] }))
@@ -260,7 +260,7 @@ const systemInfo = computed<[string, string][]>(() => {
       <div class="card">
         <div class="card-head">
           <h2>NTP clients</h2>
-          <span class="sub">since chronyd start</span>
+          <span class="sub">busiest {{ Math.min(50, chrony?.client_count ?? 0) }} of {{ fmtNum(chrony?.client_count) }} · since chronyd start</span>
         </div>
         <ClientsTable :clients="clients" />
       </div>

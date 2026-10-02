@@ -164,7 +164,8 @@ class ChronyStatus(BaseModel):
     sourcestats: list[SourceStats]
     serverstats: ServerStats | None
     activity: Activity | None
-    client_count: int
+    client_count: int = Field(description="Clients in chronyd's client log (since start, bounded by clientloglimit)")
+    ntp_requests_per_s: float | None = Field(description="NTP requests per second over the last poll interval")
 
 
 # --- host, aggregate, history ---

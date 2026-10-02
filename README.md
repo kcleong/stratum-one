@@ -174,7 +174,9 @@ server lobsang.local iburst prefer
 ```
 or for systemd-timesyncd (`/etc/systemd/timesyncd.conf`): `NTP=lobsang.local`.
 
-Adjust the `allow` lines in `chrony.conf` to your LAN ranges.
+`chrony.conf` answers any client (set up for the public NTP Pool, with `ratelimit` and a bounded
+`clientloglimit`); what can reach UDP 123 is decided by the router. For a LAN-only server,
+restrict it with `allow <your LAN>/24`.
 
 ## Notes
 

@@ -5,7 +5,8 @@ import { fmtAgo, fmtLog2, fmtNum } from '../lib/format'
 
 const props = defineProps<{ clients: Client[] }>()
 const rows = computed(() =>
-  props.clients.filter((c) => c.ntp_packets > 0).sort((a, b) => (a.ntp_last_rx_s ?? 1e12) - (b.ntp_last_rx_s ?? 1e12)),
+  // Server-side: the busiest 50 plus LAN clients. Busiest first.
+  props.clients.filter((c) => c.ntp_packets > 0).sort((a, b) => b.ntp_packets - a.ntp_packets),
 )
 </script>
 
