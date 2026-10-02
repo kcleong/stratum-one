@@ -11,6 +11,7 @@ class Settings:
     gpsd_host: str
     gpsd_port: int
     chrony_interval: float     # seconds between chronyc polls (also history resolution)
+    clients_interval: float    # seconds between `chronyc clients` polls (large on a public server)
     history_hours: float       # in memory at full resolution
     history_days: float        # kept in SQLite, served as bucket averages
     history_db: str | None     # SQLite path; history is memory-only when unset
@@ -34,6 +35,7 @@ def load_settings() -> Settings:
         gpsd_host=env("GPSD_HOST", "127.0.0.1"),
         gpsd_port=int(env("GPSD_PORT", "2947")),
         chrony_interval=float(env("CHRONY_INTERVAL", "5")),
+        clients_interval=float(env("CLIENTS_INTERVAL", "60")),
         history_hours=float(env("HISTORY_HOURS", "24")),
         history_days=float(env("HISTORY_DAYS", "30")),
         history_db=env("HISTORY_DB", "/data/history.db") or None,

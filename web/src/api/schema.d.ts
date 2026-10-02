@@ -79,7 +79,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** NTP clients seen by chrony */
+        /** Busiest 50 NTP clients by requests, plus all LAN clients */
         get: operations["clients_api_chrony_clients_get"];
         put?: never;
         post?: never;
@@ -183,8 +183,16 @@ export interface components {
             sourcestats: components["schemas"]["SourceStats"][];
             serverstats: components["schemas"]["ServerStats"] | null;
             activity: components["schemas"]["Activity"] | null;
-            /** Client Count */
+            /**
+             * Client Count
+             * @description Clients in chronyd's client log (since start, bounded by clientloglimit)
+             */
             client_count: number;
+            /**
+             * Ntp Requests Per S
+             * @description NTP requests per second over the last poll interval
+             */
+            ntp_requests_per_s: number | null;
         };
         /** Client */
         Client: {

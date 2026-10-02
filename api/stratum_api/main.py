@@ -37,6 +37,7 @@ async def lifespan(app: FastAPI):
     tasks = [
         asyncio.create_task(monitor.gps.run()),
         asyncio.create_task(monitor.run_chrony()),
+        asyncio.create_task(monitor.run_clients()),
         asyncio.create_task(monitor.run_flush()),
     ]
     if settings.mqtt_host:
@@ -78,7 +79,7 @@ def chrony() -> ChronyStatus:
     return _monitor().chrony.snapshot()
 
 
-@app.get("/api/chrony/clients", summary="NTP clients seen by chrony")
+@app.get("/api/chrony/clients", summary="Busiest 50 NTP clients by requests, plus all LAN clients")
 def clients() -> list[Client]:
     return _monitor().chrony.clients
 

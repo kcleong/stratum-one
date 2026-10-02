@@ -47,6 +47,11 @@ class Monitor:
             self._record()
             await asyncio.sleep(max(0.0, self.settings.chrony_interval - (time.monotonic() - started)))
 
+    async def run_clients(self) -> None:
+        while True:
+            await self.chrony.poll_clients()
+            await asyncio.sleep(self.settings.clients_interval)
+
     async def run_flush(self) -> None:
         while True:
             await asyncio.sleep(self.settings.history_flush_minutes * 60)
