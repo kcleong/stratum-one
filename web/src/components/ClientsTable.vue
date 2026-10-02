@@ -8,6 +8,24 @@ const rows = computed(() =>
   // Server-side: the busiest 50 plus LAN clients. Busiest first.
   props.clients.filter((c) => c.ntp_packets > 0).sort((a, b) => b.ntp_packets - a.ntp_packets),
 )
+
+// Regional-indicator pair: "NL" -> 🇳🇱
+const flag = (cc: string) => String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 0x1f1a5 + ch.charCodeAt(0)))
+
+// Private/loopback/link-local: no country or provider to show.
+const isLan = (a: string) => /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|f[cd][0-9a-f]{2}:|fe80:|::1$)/i.test(a)
+
+// IPv6 shortened to its /64 network; the full address is in the tooltip.
+const shortAddr = (a: string) => (a.includes(':') ? `${a.split(':').slice(0, 4).join(':')}:…` : a)
+
+const regionName = new Intl.DisplayNames(undefined, { type: 'region' })
+const country = (cc: string) => {
+  try {
+    return regionName.of(cc) ?? cc
+  } catch {
+    return cc
+  }
+}
 </script>
 
 <template>
@@ -17,6 +35,8 @@ const rows = computed(() =>
       <thead>
         <tr>
           <th>Client</th>
+          <th>Country</th>
+          <th>Provider</th>
           <th class="r">Requests</th>
           <th class="r">Dropped</th>
           <th class="r">Interval</th>
@@ -25,7 +45,14 @@ const rows = computed(() =>
       </thead>
       <tbody>
         <tr v-for="c in rows" :key="c.address">
-          <td class="num">{{ c.address }}</td>
+          <td class="num" :title="c.address">{{ shortAddr(c.address) }}</td>
+          <td>
+            <template v-if="c.country">
+              <span aria-hidden="true">{{ flag(c.country) }}</span> <span :title="country(c.country)">{{ c.country }}</span>
+            </template>
+            <span v-else-if="isLan(c.address)" class="sub">LAN</span>
+          </td>
+          <td class="provider" :title="c.asn ? `AS${c.asn} ${c.asn_org ?? ''}` : undefined">{{ c.asn_org ?? '' }}</td>
           <td class="r">{{ fmtNum(c.ntp_packets) }}</td>
           <td class="r">{{ fmtNum(c.ntp_dropped) }}</td>
           <td class="r">{{ fmtLog2(c.ntp_interval) }}</td>
@@ -35,3 +62,11 @@ const rows = computed(() =>
     </table>
   </div>
 </template>
+
+<style scoped>
+.provider {
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+</style>

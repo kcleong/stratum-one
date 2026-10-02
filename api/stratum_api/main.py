@@ -40,6 +40,8 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(monitor.run_clients()),
         asyncio.create_task(monitor.run_flush()),
     ]
+    if monitor.geo is not None:
+        tasks.append(asyncio.create_task(monitor.geo.run()))
     if settings.mqtt_host:
         tasks.append(asyncio.create_task(MqttPublisher(settings, monitor).run()))
     else:
