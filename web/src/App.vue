@@ -256,14 +256,16 @@ const systemInfo = computed<[string, string][]>(() => {
       <SourcesTable v-if="chrony" :sources="chrony.sources" :stats="chrony.sourcestats" />
     </section>
 
-    <section class="bottom">
-      <div class="card">
-        <div class="card-head">
-          <h2>NTP clients</h2>
-          <span class="sub">busiest {{ Math.min(50, chrony?.client_count ?? 0) }} of {{ fmtNum(chrony?.client_count) }} · since chronyd start</span>
-        </div>
-        <ClientsTable :clients="clients" />
+    <section class="card">
+      <div class="card-head">
+        <h2>NTP clients</h2>
+        <span class="sub">busiest {{ Math.min(50, chrony?.client_count ?? 0) }} of {{ fmtNum(chrony?.client_count) }} · since chronyd start</span>
       </div>
+      <ClientsTable :clients="clients" />
+      <p class="sub credit">Country and provider: <a href="https://db-ip.com" target="_blank" rel="noopener">IP data by DB-IP</a> (CC BY 4.0)</p>
+    </section>
+
+    <section class="bottom">
       <div class="card">
         <div class="card-head"><h2>Server statistics</h2></div>
         <KeyValues :items="serverStats" />
@@ -387,8 +389,15 @@ button.ghost {
 }
 .bottom {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+.credit {
+  margin: 8px 0 0;
+  font-size: 11px;
+}
+.credit a {
+  color: inherit;
 }
 @media (max-width: 1100px) {
   .hero,

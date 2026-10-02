@@ -218,6 +218,21 @@ export interface components {
             cmd_dropped: number;
             /** Cmd Last Rx S */
             cmd_last_rx_s: number | null;
+            /**
+             * Country
+             * @description ISO 3166 country code (DB-IP Lite); none for LAN
+             */
+            country?: string | null;
+            /**
+             * Asn
+             * @description Autonomous system number of the network (DB-IP Lite)
+             */
+            asn?: number | null;
+            /**
+             * Asn Org
+             * @description Provider owning that network (DB-IP Lite)
+             */
+            asn_org?: string | null;
         };
         /** ConstellationCount */
         ConstellationCount: {

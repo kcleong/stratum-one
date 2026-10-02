@@ -152,6 +152,9 @@ class Client(BaseModel):
     cmd_packets: int
     cmd_dropped: int
     cmd_last_rx_s: int | None
+    country: str | None = Field(None, description="ISO 3166 country code (DB-IP Lite); none for LAN")
+    asn: int | None = Field(None, description="Autonomous system number of the network (DB-IP Lite)")
+    asn_org: str | None = Field(None, description="Provider owning that network (DB-IP Lite)")
 
 
 class ChronyStatus(BaseModel):

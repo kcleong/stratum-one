@@ -107,7 +107,8 @@ After changing dependencies run `uv lock` in `api/`.
 - `GET /api/status`: everything below in one document
 - `GET /api/gps`, `/api/gps/satellites`: fix, DOPs, per-satellite az/el/SNR
 - `GET /api/chrony`, `/api/chrony/clients`: tracking, sources, sourcestats,
-  serverstats, clients
+  serverstats, clients (busiest 50 plus LAN, with country and provider from the
+  [DB-IP](https://db-ip.com) Lite databases, CC BY 4.0, downloaded monthly to `GEOIP_DIR`)
 - `GET /api/system`: CPU temperature, load, uptime, memory
 - `GET /api/history?minutes=60`: offsets, frequency, satellites and
   temperature; raw 5 s samples up to 24 h, bucket averages with offset

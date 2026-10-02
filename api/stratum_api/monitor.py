@@ -9,6 +9,7 @@ from collections import deque
 from . import system
 from .chrony import ChronyMonitor
 from .config import Settings
+from .geo import GeoLookup
 from .gpsd import GpsdClient
 from .models import HistoryPoint, HistorySample, Status
 from .store import HistoryStore, bucket_samples
@@ -24,6 +25,7 @@ class Monitor:
         self.settings = settings
         self.gps = GpsdClient(settings.gpsd_host, settings.gpsd_port)
         self.chrony = ChronyMonitor()
+        self.geo = GeoLookup(settings.geoip_dir) if settings.geoip_dir else None
         maxlen = int(settings.history_hours * 3600 / settings.chrony_interval)
         self.history: deque[HistorySample] = deque(maxlen=maxlen)
         self._unsaved: list[HistorySample] = []
@@ -50,6 +52,11 @@ class Monitor:
     async def run_clients(self) -> None:
         while True:
             await self.chrony.poll_clients()
+            if self.geo is not None:
+                self.chrony.clients = [
+                    c.model_copy(update=dict(zip(("country", "asn", "asn_org"), self.geo.lookup(c.address))))
+                    for c in self.chrony.clients
+                ]
             await asyncio.sleep(self.settings.clients_interval)
 
     async def run_flush(self) -> None:
