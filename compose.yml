@@ -21,6 +21,12 @@ services:
       - /run
     mem_limit: 128m
     restart: unless-stopped
+    healthcheck:                     # chronyd answers on its command socket
+      test: ["CMD", "chronyc", "-n", "tracking"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   gpsd:
     build:
@@ -55,6 +61,12 @@ services:
     cpus: 1.0                        # runaway guard; chronyd runs at RT priority anyway
     mem_limit: 192m                  # ~60 MiB with 24 h history + headroom for requests
     restart: unless-stopped
+    healthcheck:                     # HTTP server responsive and gpsd + chronyd reachable (503 otherwise)
+      test: ["CMD-SHELL", "wget -q -O /dev/null -T 5 http://127.0.0.1:$${API_PORT:-8000}/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   chrony-state:
