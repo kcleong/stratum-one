@@ -1,9 +1,11 @@
 """chronyd stats via `chronyc -c` (CSV output) over the shared /run/chrony socket."""
 
 import asyncio
+import heapq
 import ipaddress
 import logging
 import time
+from collections.abc import AsyncIterator
 
 from .models import Activity, ChronyStatus, Client, ServerStats, Source, SourceStats, Tracking
 
@@ -59,6 +61,33 @@ async def chronyc(*args: str, timeout: float = 5.0) -> list[list[str]]:
     if proc.returncode:
         raise ChronycError(f"chronyc {' '.join(args)}: {err.decode().strip() or proc.returncode}")
     return [line.split(",") for line in out.decode().splitlines() if line]
+
+
+async def chronyc_rows(*args: str, timeout: float = 30.0) -> AsyncIterator[list[list[str]]]:
+    """Like chronyc(), but yields batches of rows as they arrive, for output too large to hold."""
+    proc = await asyncio.create_subprocess_exec(
+        "chronyc", "-c", *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    rest = b""
+    try:
+        # 64 KiB reads, not readline(): per-line awaits cost ~0.1 ms each on a Pi.
+        while chunk := await asyncio.wait_for(proc.stdout.read(65536), max(0.0, deadline - loop.time())):
+            *lines, rest = (rest + chunk).split(b"\n")
+            yield [line.decode().split(",") for line in lines if line]
+        if rest.strip():
+            yield [rest.decode().split(",")]
+        await asyncio.wait_for(proc.wait(), max(0.0, deadline - loop.time()))
+    except TimeoutError:
+        raise ChronycError(f"chronyc {' '.join(args)}: timed out") from None
+    finally:
+        if proc.returncode is None:
+            proc.kill()
+            await proc.wait()
+    if proc.returncode:
+        err = await proc.stderr.read()
+        raise ChronycError(f"chronyc {' '.join(args)}: {err.decode().strip() or proc.returncode}")
 
 
 def _int(value: str, unset: int | None = None) -> int | None:
@@ -196,19 +225,32 @@ class ChronyMonitor:
             self.ntp_requests_per_s = (received - last[1]) / (now - last[0])
 
     async def poll_clients(self) -> None:
-        """The client log can hold tens of thousands of rows: polled slowly, only the busiest kept."""
+        """Count all clients but keep only the busiest public ones plus every LAN client.
+
+        A public pool server's client log holds up to clientloglimit worth of rows (hundreds of
+        thousands), so rows are streamed and only a small heap is ever held in memory.
+        """
+        count = 0
+        busiest: list[tuple[int, int, list[str]]] = []   # min-heap of (ntp_packets, seq, row)
+        lan: list[list[str]] = []
         try:
-            rows = await chronyc("-n", "clients", timeout=30.0)
-            clients = [parse_client(r) for r in rows]
+            async for rows in chronyc_rows("-n", "clients"):
+                for row in rows:
+                    count += 1
+                    packets = int(row[1])
+                    if _is_lan(row[0]):
+                        lan.append(row)
+                    elif len(busiest) < CLIENTS_TOP:
+                        heapq.heappush(busiest, (packets, count, row))
+                    elif packets > busiest[0][0]:
+                        heapq.heapreplace(busiest, (packets, count, row))
+                await asyncio.sleep(0)   # a full pipe buffer doesn't yield; let the API serve meanwhile
+            clients = [parse_client(r) for _, _, r in sorted(busiest, reverse=True)] + [parse_client(r) for r in lan]
         except (ChronycError, IndexError, ValueError) as e:
             log.warning("chrony clients: %s", e)
             return
-        clients.sort(key=lambda c: c.ntp_packets, reverse=True)
-        top = clients[:CLIENTS_TOP]
-        # Always keep LAN clients visible, however quiet.
-        top += [c for c in clients[CLIENTS_TOP:] if _is_private(c.address)]
-        self.client_count = len(clients)
-        self.clients = top
+        self.client_count = count
+        self.clients = clients
 
     @property
     def selected_source(self) -> Source | None:
@@ -235,7 +277,10 @@ class ChronyMonitor:
         )
 
 
-def _is_private(address: str) -> bool:
+def _is_lan(address: str) -> bool:
+    # Cheap prefix test first: ip_address() on every row of a large client log is the slow part.
+    if not address.startswith(("10.", "172.", "192.168.", "127.", "fc", "fd", "fe80:", "::1")):
+        return False
     try:
         return ipaddress.ip_address(address).is_private
     except ValueError:
