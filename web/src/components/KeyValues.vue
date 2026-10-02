@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { INFO } from '../lib/glossary'
+import InfoTip from './InfoTip.vue'
+
 defineProps<{ items: [string, string][] }>()
 </script>
 
 <template>
   <dl>
     <template v-for="[k, v] in items" :key="k">
-      <dt>{{ k }}</dt>
+      <dt>{{ k }} <InfoTip v-if="INFO[k]" :text="INFO[k]" :label="k" /></dt>
       <dd class="num">{{ v }}</dd>
     </template>
   </dl>

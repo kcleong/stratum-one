@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import type { Source, SourceStats } from '../api/types'
 import { fmtAgo, fmtLog2, fmtNum, fmtOffset, fmtSpan } from '../lib/format'
+import { INFO } from '../lib/glossary'
+import InfoTip from './InfoTip.vue'
 
 const props = defineProps<{ sources: Source[]; stats: SourceStats[] }>()
 
@@ -33,12 +35,12 @@ const answered = (reach: number) => bits(reach).reduce((a, b) => a + b, 0)
           <th>Source</th>
           <th class="r">Stratum</th>
           <th class="r">Poll</th>
-          <th title="Answers to the last 8 polls">Reach</th>
+          <th>Reach <InfoTip :text="INFO['Reach']" label="Reach" /></th>
           <th class="r">Last</th>
-          <th class="r">Offset</th>
-          <th class="r">± error</th>
-          <th class="r">Std dev</th>
-          <th class="r">Freq</th>
+          <th class="r"><InfoTip :text="INFO['Offset']" label="Offset" /> Offset</th>
+          <th class="r"><InfoTip :text="INFO['± error']" label="± error" /> ± error</th>
+          <th class="r"><InfoTip :text="INFO['Std dev']" label="Std dev" /> Std dev</th>
+          <th class="r"><InfoTip :text="INFO['Freq']" label="Freq" /> Freq</th>
         </tr>
       </thead>
       <tbody>

@@ -15,6 +15,7 @@ import StatusPill from './components/StatusPill.vue'
 import UtcClock from './components/UtcClock.vue'
 import './lib/echarts'
 import { fmtAgo, fmtBytes, fmtNum, fmtOffset, fmtSpan, fmtUptime } from './lib/format'
+import { INFO } from './lib/glossary'
 import { cycleTheme, themePref } from './lib/theme'
 
 connect('history') // shared crosshair and zoom across the history charts
@@ -100,7 +101,7 @@ const tiles = computed(() => {
       sub: `${fmtNum(chrony.value?.serverstats?.ntp_packets_received)} requests`,
     },
     { label: 'CPU temperature', value: fmtNum(s?.cpu_temp_c, 1, ' °C'), sub: `load ${fmtNum(s?.load?.[0], 2)}` },
-  ]
+  ].map((tile) => ({ ...tile, info: INFO[tile.label] }))
 })
 
 const us = (v: number | null | undefined) => (v == null ? null : v * 1e6)
