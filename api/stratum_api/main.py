@@ -16,6 +16,7 @@ from .models import (
     HistoryPoint,
     HistorySample,
     PoolHistory,
+    Provider,
     Satellite,
     Status,
     SystemStatus,
@@ -89,6 +90,15 @@ def chrony() -> ChronyStatus:
 @app.get("/api/chrony/clients", summary="Busiest 50 NTP clients by requests, plus all LAN clients")
 def clients() -> list[Client]:
     return _monitor().chrony.clients
+
+
+@app.get(
+    "/api/chrony/providers",
+    summary="Top 10 networks (ASN) of public clients active in the last hour",
+    description="Counted over all active clients, not just the busiest 50. Empty when GEOIP_DIR is unset.",
+)
+def providers() -> list[Provider]:
+    return _monitor().providers
 
 
 @app.get("/api/system", summary="Host temperature, load, uptime, memory")

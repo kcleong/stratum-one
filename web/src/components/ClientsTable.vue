@@ -3,10 +3,13 @@ import { computed } from 'vue'
 import type { Client } from '../api/types'
 import { fmtAgo, fmtLog2, fmtNum } from '../lib/format'
 
-const props = defineProps<{ clients: Client[] }>()
+const props = defineProps<{ clients: Client[]; max?: number }>()
 const rows = computed(() =>
   // Server-side: the busiest 50 plus LAN clients. Busiest first.
-  props.clients.filter((c) => c.ntp_packets > 0).sort((a, b) => b.ntp_packets - a.ntp_packets),
+  props.clients
+    .filter((c) => c.ntp_packets > 0)
+    .sort((a, b) => b.ntp_packets - a.ntp_packets)
+    .slice(0, props.max),
 )
 
 // Regional-indicator pair: "NL" -> 🇳🇱

@@ -89,6 +89,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chrony/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Top 10 networks (ASN) of public clients active in the last hour
+         * @description Counted over all active clients, not just the busiest 50. Empty when GEOIP_DIR is unset.
+         */
+        get: operations["providers_api_chrony_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system": {
         parameters: {
             query?: never;
@@ -213,6 +233,11 @@ export interface components {
              * @description Clients with an NTP request in the last hour; null until the first clients poll
              */
             active_clients: number | null;
+            /**
+             * Active Clients Ipv6
+             * @description Of active_clients, those using IPv6
+             */
+            active_clients_ipv6: number | null;
             /**
              * Ntp Requests Per S
              * @description NTP requests per second over the last poll interval
@@ -452,6 +477,29 @@ export interface components {
              * @description Overall pool score (recent median of the monitors); > 10 is in the pool DNS
              */
             score: number;
+        };
+        /** Provider */
+        Provider: {
+            /**
+             * Asn
+             * @description Autonomous system number (DB-IP Lite); null = not in the database
+             */
+            asn: number | null;
+            /**
+             * Asn Org
+             * @description Provider owning that network
+             */
+            asn_org: string | null;
+            /**
+             * Clients
+             * @description Public clients of this provider active in the last hour
+             */
+            clients: number;
+            /**
+             * Ntp Packets
+             * @description NTP requests from those clients since chronyd started
+             */
+            ntp_packets: number;
         };
         /** Satellite */
         Satellite: {
@@ -796,6 +844,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Client"][];
+                };
+            };
+        };
+    };
+    providers_api_chrony_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Provider"][];
                 };
             };
         };

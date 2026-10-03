@@ -109,6 +109,8 @@ After changing dependencies run `uv lock` in `api/`.
 - `GET /api/chrony`, `/api/chrony/clients`: tracking, sources, sourcestats,
   serverstats, clients (busiest 50 plus LAN, with country and provider from the
   [DB-IP](https://db-ip.com) Lite databases, CC BY 4.0, downloaded monthly to `GEOIP_DIR`)
+- `GET /api/chrony/providers`: top 10 networks (ASN) of all public clients
+  active in the last hour
 - `GET /api/system`: CPU temperature, load, uptime, memory
 - `GET /api/history?minutes=60`: offsets, frequency, satellites,
   temperature and NTP request rate; raw 5 s samples up to 24 h, bucket
@@ -151,7 +153,8 @@ addresses; keep port 8000 on the LAN.
 `http://lobsang.local:8000/`: live UTC clock, lock/fix status, history charts
 of offsets, frequency, satellites, temperature, NTP load and pool score
 (1 h to 30 d, ctrl+scroll or pinch to zoom), sky
-plot, signal strength per satellite, chrony sources, NTP clients and host
+plot, signal strength per satellite, chrony sources, NTP clients (busiest 20),
+top client providers and host
 stats. Vue 3 + ECharts in `web/`, built into the api image by the first
 stage of `api/Dockerfile` (no Node needed on the host).
 

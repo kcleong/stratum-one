@@ -179,6 +179,8 @@ class ChronyMonitor:
         self.clients: list[Client] = []
         self.client_count = 0
         self.active_clients: int | None = None
+        self.active_clients_ipv6: int | None = None
+        self.active_public: list[tuple[str, int]] = []   # (address, ntp_packets) of active non-LAN clients
         self.ntp_requests_per_s: float | None = None
         self._last_rx: tuple[float, int] | None = None   # (monotonic time, ntp_packets_received)
         self.error: str | None = None
@@ -232,17 +234,22 @@ class ChronyMonitor:
         A public pool server's client log holds up to clientloglimit worth of rows (hundreds of
         thousands), so rows are streamed and only a small heap is ever held in memory.
         """
-        count = active = 0
+        count = active = active_v6 = 0
         busiest: list[tuple[int, int, list[str]]] = []   # min-heap of (ntp_packets, seq, row)
         lan: list[list[str]] = []
+        active_public: list[tuple[str, int]] = []
         try:
             async for rows in chronyc_rows("-n", "clients"):
                 for row in rows:
                     count += 1
                     packets = int(row[1])
+                    is_lan = _is_lan(row[0])
                     if packets and (last := _int(row[5], UNSET_LAST)) is not None and last <= ACTIVE_WINDOW_S:
                         active += 1
-                    if _is_lan(row[0]):
+                        active_v6 += ":" in row[0]
+                        if not is_lan:
+                            active_public.append((row[0], packets))
+                    if is_lan:
                         lan.append(row)
                     elif len(busiest) < CLIENTS_TOP:
                         heapq.heappush(busiest, (packets, count, row))
@@ -255,6 +262,8 @@ class ChronyMonitor:
             return
         self.client_count = count
         self.active_clients = active
+        self.active_clients_ipv6 = active_v6
+        self.active_public = active_public
         self.clients = clients
 
     @property
@@ -279,6 +288,7 @@ class ChronyMonitor:
             activity=self.activity,
             client_count=self.client_count,
             active_clients=self.active_clients,
+            active_clients_ipv6=self.active_clients_ipv6,
             ntp_requests_per_s=self.ntp_requests_per_s,
         )
 

@@ -11,7 +11,7 @@ from .chrony import ChronyMonitor
 from .config import Settings
 from .geo import GeoLookup
 from .gpsd import GpsdClient
-from .models import HistoryPoint, HistorySample, Status
+from .models import HistoryPoint, HistorySample, Provider, Status
 from .pool import PoolMonitor
 from .store import HistoryStore, bucket_samples
 
@@ -19,6 +19,7 @@ log = logging.getLogger(__name__)
 
 MAX_POINTS = 1500
 BUCKETS_S = (30, 60, 120, 300, 600, 900, 1800, 3600, 7200)
+TOP_PROVIDERS = 10
 
 
 class Monitor:
@@ -27,6 +28,7 @@ class Monitor:
         self.gps = GpsdClient(settings.gpsd_host, settings.gpsd_port)
         self.chrony = ChronyMonitor()
         self.geo = GeoLookup(settings.geoip_dir) if settings.geoip_dir else None
+        self.providers: list[Provider] = []   # top networks of active public clients; needs geo
         maxlen = int(settings.history_hours * 3600 / settings.chrony_interval)
         self.history: deque[HistorySample] = deque(maxlen=maxlen)
         self._unsaved: list[HistorySample] = []
@@ -63,7 +65,19 @@ class Monitor:
                     c.model_copy(update=dict(zip(("country", "asn", "asn_org"), self.geo.lookup(c.address))))
                     for c in self.chrony.clients
                 ]
+                # One lookup per active client; off the event loop on a busy pool server.
+                self.providers = await asyncio.to_thread(self._top_providers, self.chrony.active_public)
             await asyncio.sleep(self.settings.clients_interval)
+
+    def _top_providers(self, active: list[tuple[str, int]]) -> list[Provider]:
+        by_asn: dict[int | None, list] = {}   # asn -> [org, clients, packets]
+        for address, packets in active:
+            _, asn, org = self.geo.lookup(address)
+            entry = by_asn.setdefault(asn, [org, 0, 0])
+            entry[1] += 1
+            entry[2] += packets
+        top = sorted(by_asn.items(), key=lambda kv: (kv[1][1], kv[1][2]), reverse=True)[:TOP_PROVIDERS]
+        return [Provider(asn=asn, asn_org=org, clients=n, ntp_packets=p) for asn, (org, n, p) in top]
 
     async def run_flush(self) -> None:
         while True:

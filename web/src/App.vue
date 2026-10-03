@@ -6,6 +6,7 @@ import ClientsTable from './components/ClientsTable.vue'
 import ConstellationLegend from './components/ConstellationLegend.vue'
 import HistoryChart, { type Series } from './components/HistoryChart.vue'
 import KeyValues from './components/KeyValues.vue'
+import ProvidersTable from './components/ProvidersTable.vue'
 import SatelliteTable from './components/SatelliteTable.vue'
 import SkyPlot from './components/SkyPlot.vue'
 import SnrBars from './components/SnrBars.vue'
@@ -30,7 +31,8 @@ const RANGES = [
 ]
 const minutes = ref(60)
 const { samples, bucketSeconds, loading } = useHistory(minutes)
-const { clients } = useClients()
+const { clients, providers } = useClients()
+const CLIENT_ROWS = 20
 const { pool } = usePool(minutes)
 
 const gps = computed(() => status.value?.gps)
@@ -80,6 +82,11 @@ const pills = computed(() => {
   return out
 })
 
+const ipv6Share = computed(() => {
+  const c = chrony.value
+  return c?.active_clients && c.active_clients_ipv6 != null ? (100 * c.active_clients_ipv6) / c.active_clients : null
+})
+
 const tiles = computed(() => {
   const t = tracking.value
   const g = gps.value
@@ -99,7 +106,7 @@ const tiles = computed(() => {
     {
       label: 'NTP clients',
       value: fmtNum(chrony.value?.active_clients),
-      sub: `${fmtNum(chrony.value?.ntp_requests_per_s, 1)} req/s · ${fmtNum(chrony.value?.client_count)} since start`,
+      sub: `${fmtNum(ipv6Share.value, 0, ' %')} IPv6 · ${fmtNum(chrony.value?.ntp_requests_per_s, 1)} req/s · ${fmtNum(chrony.value?.client_count)} since start`,
     },
     { label: 'CPU temperature', value: fmtNum(s?.cpu_temp_c, 1, ' °C'), sub: `load ${fmtNum(s?.load?.[0], 2)}` },
   ].map((tile) => ({ ...tile, info: INFO[tile.label] }))
@@ -283,9 +290,17 @@ const systemInfo = computed<[string, string][]>(() => {
     <section class="card">
       <div class="card-head">
         <h2>NTP clients</h2>
-        <span class="sub">busiest {{ Math.min(50, chrony?.client_count ?? 0) }} of {{ fmtNum(chrony?.client_count) }} · since chronyd start</span>
+        <span class="sub">busiest {{ Math.min(CLIENT_ROWS, chrony?.client_count ?? 0) }} of {{ fmtNum(chrony?.client_count) }} · since chronyd start</span>
       </div>
-      <ClientsTable :clients="clients" />
+      <ClientsTable :clients="clients" :max="CLIENT_ROWS" />
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Top providers</h2>
+        <span class="sub">networks of the {{ fmtNum(chrony?.active_clients) }} clients active in the last hour</span>
+      </div>
+      <ProvidersTable :providers="providers" :active="chrony?.active_clients ?? 0" />
       <p class="sub credit">Country and provider: <a href="https://db-ip.com" target="_blank" rel="noopener">IP data by DB-IP</a> (CC BY 4.0)</p>
     </section>
 

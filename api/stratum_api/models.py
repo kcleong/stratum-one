@@ -157,6 +157,13 @@ class Client(BaseModel):
     asn_org: str | None = Field(None, description="Provider owning that network (DB-IP Lite)")
 
 
+class Provider(BaseModel):
+    asn: int | None = Field(description="Autonomous system number (DB-IP Lite); null = not in the database")
+    asn_org: str | None = Field(description="Provider owning that network")
+    clients: int = Field(description="Public clients of this provider active in the last hour")
+    ntp_packets: int = Field(description="NTP requests from those clients since chronyd started")
+
+
 class ChronyStatus(BaseModel):
     ok: bool = Field(description="Last poll of chronyd succeeded")
     error: str | None
@@ -169,6 +176,7 @@ class ChronyStatus(BaseModel):
     activity: Activity | None
     client_count: int = Field(description="Clients in chronyd's client log (since start, bounded by clientloglimit)")
     active_clients: int | None = Field(description="Clients with an NTP request in the last hour; null until the first clients poll")
+    active_clients_ipv6: int | None = Field(description="Of active_clients, those using IPv6")
     ntp_requests_per_s: float | None = Field(description="NTP requests per second over the last poll interval")
 
 
