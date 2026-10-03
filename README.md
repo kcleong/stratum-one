@@ -139,7 +139,7 @@ addresses; keep port 8000 on the LAN.
 ### Dashboard
 
 `http://lobsang.local:8000/`: live UTC clock, lock/fix status, offsets,
-frequency, satellite history charts (15 min to 24 h, scroll to zoom), sky
+frequency, satellite history charts (15 min to 24 h, ctrl+scroll or pinch to zoom), sky
 plot, signal strength per satellite, chrony sources, NTP clients and host
 stats. Vue 3 + ECharts in `web/`, built into the api image by the first
 stage of `api/Dockerfile` (no Node needed on the host).
