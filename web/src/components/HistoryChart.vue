@@ -87,7 +87,8 @@ const option = computed(() => {
       axisLabel: { color: t.muted, fontSize: 11, formatter: (v: number) => `${+v.toFixed(3)}` },
       splitLine: { lineStyle: { color: t.grid } },
     },
-    dataZoom: [{ type: 'inside', filterMode: 'none' }],
+    // Ctrl+wheel (and trackpad pinch, which browsers send as ctrl+wheel) zooms; plain wheel scrolls the page.
+    dataZoom: [{ type: 'inside', filterMode: 'none', zoomOnMouseWheel: 'ctrl', moveOnMouseWheel: false }],
     series: rendered.map(({ kind, s }, i) => {
       if (kind === 'line')
         return {
@@ -132,7 +133,7 @@ const option = computed(() => {
   <section class="card" :class="{ dimmed }">
     <div class="card-head">
       <h2>{{ title }}</h2>
-      <span class="sub">{{ unit }} · scroll to zoom</span>
+      <span class="sub">{{ unit }} · ctrl+scroll or pinch to zoom</span>
     </div>
     <VChart class="chart" :option="option" group="history" autoresize />
   </section>
