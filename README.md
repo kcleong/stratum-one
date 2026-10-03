@@ -156,7 +156,7 @@ addresses; keep port 8000 on the LAN.
 of offsets, frequency, satellites, temperature, NTP load and pool score
 (1 h to 30 d, ctrl+scroll or pinch to zoom), sky
 plot (live satellites, or a 24 h coverage map showing where the antenna's
-view is open or blocked), signal strength per satellite, chrony sources, NTP clients (busiest 20),
+view is open or blocked), signal strength per satellite, chrony sources, NTP clients (busiest 10),
 top client providers and host
 stats. Vue 3 + ECharts in `web/`, built into the api image by the first
 stage of `api/Dockerfile` (no Node needed on the host).
