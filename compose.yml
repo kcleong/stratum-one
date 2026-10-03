@@ -7,7 +7,7 @@ services:
         RUN apk add --no-cache chrony-nts ca-certificates   # 3.24+: plain chrony is built without NTS
     command: chronyd -d -f /etc/chrony/chrony.conf
     network_mode: host               # UDP 123 without NAT; real client IPs
-    ipc: shareable                   # gpsd writes NMEA time into SHM
+    ipc: host                        # gpsd writes NMEA time into SHM; host IPC survives restarts of either container
     cap_add: [SYS_TIME, SYS_NICE, IPC_LOCK]  # clock, sched_priority, lock_all
     ulimits:
       memlock: -1                    # lock_all
@@ -35,7 +35,7 @@ services:
         RUN apk add --no-cache gpsd
     command: gpsd -N -n -G /dev/ttyAMA2
     network_mode: host               # cgps/gpsmon on host via localhost:2947
-    ipc: "service:chrony"
+    ipc: host                        # same SHM as chrony (see above)
     devices:
       - /dev/ttyAMA2
     depends_on: [chrony]
