@@ -22,6 +22,8 @@ const props = defineProps<{
   digits?: number
   includeZero?: boolean
   dimmed?: boolean
+  /** selected history range, e.g. "last 24 h" */
+  range?: string
 }>()
 
 const tokens = useTokens()
@@ -133,7 +135,7 @@ const option = computed(() => {
   <section class="card" :class="{ dimmed }">
     <div class="card-head">
       <h2>{{ title }}</h2>
-      <span class="sub">{{ unit }} · ctrl+scroll or pinch to zoom</span>
+      <span class="sub" title="ctrl+scroll or pinch to zoom">{{ unit }}<template v-if="range"> · {{ range }}</template></span>
     </div>
     <VChart class="chart" :option="option" group="history" autoresize />
   </section>

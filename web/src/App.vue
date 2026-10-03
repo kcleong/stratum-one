@@ -31,6 +31,7 @@ const RANGES = [
   { label: '30 d', minutes: 30 * 1440 },
 ]
 const minutes = ref(60)
+const rangeLabel = computed(() => `last ${RANGES.find((r) => r.minutes === minutes.value)?.label ?? ''}`)
 const { samples, bucketSeconds, loading } = useHistory(minutes)
 const { clients, providers } = useClients()
 const CLIENT_ROWS = 10
@@ -252,28 +253,42 @@ const systemInfo = computed<[string, string][]>(() => {
       </div>
     </section>
 
-    <div class="filters" role="group" aria-label="History range">
-      <span class="sub">History</span>
-      <button
-        v-for="r in RANGES"
-        :key="r.minutes"
-        type="button"
-        :class="{ active: minutes === r.minutes }"
-        :aria-pressed="minutes === r.minutes"
-        @click="minutes = r.minutes"
-      >
-        {{ r.label }}
-      </button>
-      <span class="sub">{{ samples.length }} points · {{ resolution }}</span>
-    </div>
-
-    <section class="charts">
-      <HistoryChart title="Clock offset" unit="µs" :series="hist.offset" include-zero :dimmed="loading" />
-      <HistoryChart title="Oscillator frequency" unit="ppm" :series="hist.frequency" :digits="3" :dimmed="loading" />
-      <HistoryChart title="Satellites" unit="sats" :series="hist.satellites" :digits="0" include-zero :dimmed="loading" />
-      <HistoryChart title="CPU temperature" unit="°C" :series="hist.temperature" :digits="1" :dimmed="loading" />
-      <HistoryChart title="NTP load" unit="req/s" :series="hist.load" :digits="1" include-zero :dimmed="loading" />
-      <HistoryChart v-if="poolSeries" title="NTP Pool score" unit="score" :series="poolSeries" :digits="1" include-zero :dimmed="loading" />
+    <section class="history" aria-labelledby="history-title">
+      <div class="history-head">
+        <div>
+          <h2 id="history-title">History</h2>
+          <span class="sub">{{ samples.length }} points · {{ resolution }} · ctrl+scroll or pinch to zoom</span>
+        </div>
+        <div class="segmented" role="group" aria-label="History range for the charts below">
+          <button
+            v-for="r in RANGES"
+            :key="r.minutes"
+            type="button"
+            :class="{ active: minutes === r.minutes }"
+            :aria-pressed="minutes === r.minutes"
+            @click="minutes = r.minutes"
+          >
+            {{ r.label }}
+          </button>
+        </div>
+      </div>
+      <div class="charts">
+        <HistoryChart title="Clock offset" unit="µs" :range="rangeLabel" :series="hist.offset" include-zero :dimmed="loading" />
+        <HistoryChart title="Oscillator frequency" unit="ppm" :range="rangeLabel" :series="hist.frequency" :digits="3" :dimmed="loading" />
+        <HistoryChart title="Satellites" unit="sats" :range="rangeLabel" :series="hist.satellites" :digits="0" include-zero :dimmed="loading" />
+        <HistoryChart title="CPU temperature" unit="°C" :range="rangeLabel" :series="hist.temperature" :digits="1" :dimmed="loading" />
+        <HistoryChart title="NTP load" unit="req/s" :range="rangeLabel" :series="hist.load" :digits="1" include-zero :dimmed="loading" />
+        <HistoryChart
+          v-if="poolSeries"
+          title="NTP Pool score"
+          unit="score"
+          :range="rangeLabel"
+          :series="poolSeries"
+          :digits="1"
+          include-zero
+          :dimmed="loading"
+        />
+      </div>
     </section>
 
     <section class="gnss">
@@ -409,11 +424,45 @@ main {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
-.filters {
+/* One tinted panel: the range buttons visibly belong to the charts inside it. */
+.history {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.history-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0 4px 12px;
+}
+.history-head h2 {
+  margin: 0 0 2px;
+  font-size: 15px;
+  color: var(--ink);
+}
+.segmented {
+  display: inline-flex;
+}
+.segmented button {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.segmented button:first-child {
+  border-radius: 6px 0 0 6px;
+  margin-left: 0;
+}
+.segmented button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.segmented button.active {
+  position: relative; /* keep its border above the neighbours' */
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--surface);
 }
 button {
   font: inherit;
