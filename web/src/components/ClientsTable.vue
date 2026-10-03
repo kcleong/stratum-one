@@ -47,8 +47,9 @@ const clientTitle = (c: Client) =>
           </td>
           <td class="provider" :title="c.asn ? `AS${c.asn} ${c.asn_org ?? ''}` : undefined">{{ c.asn_org ?? '' }}</td>
           <td class="r">
+            <!-- Dropped first, so the request counts stay aligned on the right. -->
+            <span v-if="c.ntp_dropped" class="dropped" title="Not answered because of rate limiting">{{ fmtNum(c.ntp_dropped) }} dropped ·</span>
             {{ fmtNum(c.ntp_packets) }}
-            <span v-if="c.ntp_dropped" class="dropped" title="Not answered because of rate limiting">· {{ fmtNum(c.ntp_dropped) }} dropped</span>
           </td>
           <td class="r">{{ fmtAgo(c.ntp_last_rx_s) }} ago</td>
         </tr>
