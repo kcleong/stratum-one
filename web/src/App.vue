@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { connect } from 'echarts/core'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useClients, useHistory, useLiveStatus, usePool, useSky } from './api/live'
 import ClientsTable from './components/ClientsTable.vue'
@@ -19,8 +18,6 @@ import { fmtAgo, fmtBytes, fmtNum, fmtOffset, fmtSpan, fmtUptime } from './lib/f
 import { INFO } from './lib/glossary'
 import { coverageColor, SNR_STRONG, SNR_WEAK } from './lib/sky'
 import { cycleTheme, themePref } from './lib/theme'
-
-connect('history') // shared crosshair and zoom across the history charts
 
 const { status, connected, clockDelta } = useLiveStatus()
 const RANGES = [
@@ -181,7 +178,7 @@ const poolSeries = computed(() => {
       slot: i + 1,
       data: p.scores.filter((s) => s.server === server).map((s) => [s.t * 1000, s.score] as [number, number]),
     })),
-    { name: 'Pool DNS threshold', dashed: true, data: span.map((x) => [x, POOL_DNS_SCORE] as [number, number]) },
+    { name: 'Pool DNS threshold', dashed: true, noTip: true, data: span.map((x) => [x, POOL_DNS_SCORE] as [number, number]) },
   ] as Series[]
 })
 
@@ -311,7 +308,8 @@ const systemInfo = computed<[string, string][]>(() => {
           <span>average SNR</span>
           <span v-for="l in coverageLegend" :key="l.snr" class="swatch"><i :style="{ background: l.color }" />{{ l.snr }}</span>
           <span>dB-Hz ·</span>
-          <span class="swatch"><i :style="{ background: coverageColor({ samples: 1, received: 0, mean_snr: null }) }" />no signal</span>
+          <span class="swatch" title="Satellites passed through, but under half of those sightings were received: the antenna can't see that part of the sky"><i :style="{ background: coverageColor({ samples: 1, received: 0, mean_snr: null }) }" />blocked</span>
+          <span class="swatch" title="No satellite passed through this part of the sky, so there is nothing to measure"><i class="empty" />no satellite passed</span>
           <span v-if="skySince">· data from the last {{ skySince }}</span>
         </div>
         <ConstellationLegend v-else-if="gps" :gps="gps" />
@@ -534,6 +532,9 @@ button.ghost {
   width: 12px;
   height: 12px;
   border-radius: 2px;
+}
+.swatch i.empty {
+  box-shadow: inset 0 0 0 1px var(--grid);
 }
 .clients {
   display: grid;
