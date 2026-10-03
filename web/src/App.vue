@@ -33,7 +33,7 @@ const RANGES = [
 const minutes = ref(60)
 const { samples, bucketSeconds, loading } = useHistory(minutes)
 const { clients, providers } = useClients()
-const CLIENT_ROWS = 20
+const CLIENT_ROWS = 10
 const { pool } = usePool(minutes)
 
 const gps = computed(() => status.value?.gps)
@@ -480,8 +480,7 @@ button.ghost {
 .clients {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: 12px;
-  align-items: start;
+  gap: 12px; /* cards stretch to the taller of the two */
 }
 .credit {
   margin: 8px 0 0;
