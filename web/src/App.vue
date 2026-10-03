@@ -287,22 +287,24 @@ const systemInfo = computed<[string, string][]>(() => {
       <SourcesTable v-if="chrony" :sources="chrony.sources" :stats="chrony.sourcestats" />
     </section>
 
-    <section class="card">
-      <div class="card-head">
-        <h2>NTP clients</h2>
-        <span class="sub">busiest {{ Math.min(CLIENT_ROWS, chrony?.client_count ?? 0) }} of {{ fmtNum(chrony?.client_count) }} · since chronyd start</span>
-      </div>
-      <ClientsTable :clients="clients" :max="CLIENT_ROWS" />
-    </section>
+    <div class="clients">
+      <section class="card">
+        <div class="card-head">
+          <h2>NTP clients</h2>
+          <span class="sub">busiest {{ Math.min(CLIENT_ROWS, chrony?.client_count ?? 0) }} of {{ fmtNum(chrony?.client_count) }} · since chronyd start</span>
+        </div>
+        <ClientsTable :clients="clients" :max="CLIENT_ROWS" />
+      </section>
 
-    <section class="card">
-      <div class="card-head">
-        <h2>Top providers</h2>
-        <span class="sub">networks of the {{ fmtNum(chrony?.active_clients) }} clients active in the last hour</span>
-      </div>
-      <ProvidersTable :providers="providers" :active="chrony?.active_clients ?? 0" />
-      <p class="sub credit">Country and provider: <a href="https://db-ip.com" target="_blank" rel="noopener">IP data by DB-IP</a> (CC BY 4.0)</p>
-    </section>
+      <section class="card">
+        <div class="card-head">
+          <h2>Top providers</h2>
+          <span class="sub">networks of the {{ fmtNum(chrony?.active_clients) }} clients active in the last hour</span>
+        </div>
+        <ProvidersTable :providers="providers" :active="chrony?.active_clients ?? 0" />
+        <p class="sub credit">Country and provider: <a href="https://db-ip.com" target="_blank" rel="noopener">IP data by DB-IP</a> (CC BY 4.0)</p>
+      </section>
+    </div>
 
     <section class="bottom">
       <div class="card">
@@ -431,6 +433,12 @@ button.ghost {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
+.clients {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 12px;
+  align-items: start;
+}
 .credit {
   margin: 8px 0 0;
   font-size: 11px;
@@ -441,6 +449,7 @@ button.ghost {
 @media (max-width: 1100px) {
   .hero,
   .gnss,
+  .clients,
   .bottom {
     grid-template-columns: 1fr;
   }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Provider } from '../api/types'
+import { countryName, flag } from '../lib/country'
 import { fmtNum } from '../lib/format'
 
 const props = defineProps<{ providers: Provider[]; active: number }>()
@@ -15,6 +16,7 @@ const rows = computed(() => props.providers.map((p) => ({ ...p, share: props.act
       <thead>
         <tr>
           <th>Provider</th>
+          <th>Country</th>
           <th class="r">AS</th>
           <th class="r">Clients</th>
           <th class="r">Share</th>
@@ -24,6 +26,11 @@ const rows = computed(() => props.providers.map((p) => ({ ...p, share: props.act
       <tbody>
         <tr v-for="p in rows" :key="p.asn ?? 'unknown'">
           <td class="provider" :title="p.asn_org ?? undefined">{{ p.asn_org ?? 'Unknown network' }}</td>
+          <td>
+            <template v-if="p.country">
+              <span aria-hidden="true">{{ flag(p.country) }}</span> <span :title="countryName(p.country)">{{ p.country }}</span>
+            </template>
+          </td>
           <td class="r num">{{ p.asn ?? '–' }}</td>
           <td class="r">{{ fmtNum(p.clients) }}</td>
           <td class="r">{{ fmtNum(p.share, 1, ' %') }}</td>

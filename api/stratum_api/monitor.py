@@ -4,7 +4,7 @@ import asyncio
 import logging
 import sqlite3
 import time
-from collections import deque
+from collections import Counter, deque
 
 from . import system
 from .chrony import ChronyMonitor
@@ -70,14 +70,19 @@ class Monitor:
             await asyncio.sleep(self.settings.clients_interval)
 
     def _top_providers(self, active: list[tuple[str, int]]) -> list[Provider]:
-        by_asn: dict[int | None, list] = {}   # asn -> [org, clients, packets]
+        by_asn: dict[int | None, list] = {}   # asn -> [org, clients, packets, Counter of countries]
         for address, packets in active:
-            _, asn, org = self.geo.lookup(address)
-            entry = by_asn.setdefault(asn, [org, 0, 0])
+            country, asn, org = self.geo.lookup(address)
+            entry = by_asn.setdefault(asn, [org, 0, 0, Counter()])
             entry[1] += 1
             entry[2] += packets
+            entry[3][country] += 1
         top = sorted(by_asn.items(), key=lambda kv: (kv[1][1], kv[1][2]), reverse=True)[:TOP_PROVIDERS]
-        return [Provider(asn=asn, asn_org=org, clients=n, ntp_packets=p) for asn, (org, n, p) in top]
+        return [
+            # An AS can span countries: show where most of its clients are.
+            Provider(asn=asn, asn_org=org, country=countries.most_common(1)[0][0], clients=n, ntp_packets=p)
+            for asn, (org, n, p, countries) in top
+        ]
 
     async def run_flush(self) -> None:
         while True:

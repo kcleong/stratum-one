@@ -491,6 +491,11 @@ export interface components {
              */
             asn_org: string | null;
             /**
+             * Country
+             * @description Most common ISO 3166 country code among those clients (DB-IP Lite)
+             */
+            country: string | null;
+            /**
              * Clients
              * @description Public clients of this provider active in the last hour
              */
