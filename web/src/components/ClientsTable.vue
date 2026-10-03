@@ -18,6 +18,12 @@ const isLan = (a: string) => /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|
 
 // IPv6 shortened to its /64 network; the full address is in the tooltip.
 const shortAddr = (a: string) => (a.includes(':') ? `${a.split(':').slice(0, 4).join(':')}:…` : a)
+
+// Full address, country and polling interval: detail that doesn't need its own column.
+const clientTitle = (c: Client) =>
+  [c.address, c.country ? countryName(c.country) : isLan(c.address) ? 'LAN' : null, `polls every ${fmtLog2(c.ntp_interval)}`]
+    .filter(Boolean)
+    .join(' · ')
 </script>
 
 <template>
@@ -27,27 +33,23 @@ const shortAddr = (a: string) => (a.includes(':') ? `${a.split(':').slice(0, 4).
       <thead>
         <tr>
           <th>Client</th>
-          <th>Country</th>
           <th>Provider</th>
           <th class="r">Requests</th>
-          <th class="r">Dropped</th>
-          <th class="r">Interval</th>
           <th class="r">Last seen</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="c in rows" :key="c.address">
-          <td class="num" :title="c.address">{{ shortAddr(c.address) }}</td>
-          <td>
-            <template v-if="c.country">
-              <span aria-hidden="true">{{ flag(c.country) }}</span> <span :title="countryName(c.country)">{{ c.country }}</span>
-            </template>
-            <span v-else-if="isLan(c.address)" class="sub">LAN</span>
+          <td class="num" :title="clientTitle(c)">
+            <span v-if="c.country" class="flag" aria-hidden="true">{{ flag(c.country) }}</span>
+            <span v-else-if="isLan(c.address)" class="flag sub">LAN</span>
+            {{ shortAddr(c.address) }}
           </td>
           <td class="provider" :title="c.asn ? `AS${c.asn} ${c.asn_org ?? ''}` : undefined">{{ c.asn_org ?? '' }}</td>
-          <td class="r">{{ fmtNum(c.ntp_packets) }}</td>
-          <td class="r">{{ fmtNum(c.ntp_dropped) }}</td>
-          <td class="r">{{ fmtLog2(c.ntp_interval) }}</td>
+          <td class="r">
+            {{ fmtNum(c.ntp_packets) }}
+            <span v-if="c.ntp_dropped" class="dropped" title="Not answered because of rate limiting">· {{ fmtNum(c.ntp_dropped) }} dropped</span>
+          </td>
           <td class="r">{{ fmtAgo(c.ntp_last_rx_s) }} ago</td>
         </tr>
       </tbody>
@@ -60,5 +62,12 @@ const shortAddr = (a: string) => (a.includes(':') ? `${a.split(':').slice(0, 4).
   max-width: 24ch;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.flag {
+  margin-right: 6px;
+}
+.dropped {
+  color: var(--ink);
+  font-weight: 600;
 }
 </style>
