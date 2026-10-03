@@ -227,6 +227,27 @@ class HistoryPoint(HistorySample):
     pps_offset_max_s: float | None = None
 
 
+# --- Sky coverage ---
+
+
+class SkyCell(BaseModel):
+    az: int = Field(description="Lower azimuth edge of the patch, degrees from true north")
+    el: int = Field(description="Lower elevation edge of the patch, degrees above the horizon")
+    samples: int = Field(description="Satellite sightings in this patch (predicted positions included)")
+    received: int = Field(description="Sightings with a signal (SNR > 0)")
+    mean_snr: float | None = Field(description="Average SNR of the received sightings, dBHz")
+    max_snr: float | None = Field(description="Strongest SNR seen, dBHz")
+
+
+class SkyCoverage(BaseModel):
+    hours: float = Field(description="Window length (SKY_HOURS)")
+    az_step: int
+    el_step: int
+    sample_interval_s: float
+    since: float | None = Field(description="Unix time of the oldest data in the window")
+    cells: list[SkyCell]
+
+
 # --- NTP Pool ---
 
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { connect } from 'echarts/core'
 import { computed, ref, watch } from 'vue'
-import { useClients, useHistory, useLiveStatus, usePool } from './api/live'
+import { useClients, useHistory, useLiveStatus, usePool, useSky } from './api/live'
 import ClientsTable from './components/ClientsTable.vue'
 import ConstellationLegend from './components/ConstellationLegend.vue'
 import HistoryChart, { type Series } from './components/HistoryChart.vue'
@@ -17,6 +17,7 @@ import UtcClock from './components/UtcClock.vue'
 import './lib/echarts'
 import { fmtAgo, fmtBytes, fmtNum, fmtOffset, fmtSpan, fmtUptime } from './lib/format'
 import { INFO } from './lib/glossary'
+import { coverageColor, SNR_STRONG, SNR_WEAK } from './lib/sky'
 import { cycleTheme, themePref } from './lib/theme'
 
 connect('history') // shared crosshair and zoom across the history charts
@@ -40,6 +41,15 @@ const gps = computed(() => status.value?.gps)
 // Sky view filter, remembered per browser.
 const skyUsedOnly = ref(readFlag('skyUsedOnly'))
 watch(skyUsedOnly, (v) => writeFlag('skyUsedOnly', v))
+// Sky coverage map instead of the live satellites, remembered per browser.
+const skyCoverage = ref(readFlag('skyCoverage'))
+watch(skyCoverage, (v) => writeFlag('skyCoverage', v))
+const { sky } = useSky(skyCoverage)
+const coverageLegend = [SNR_WEAK, 25, 35, SNR_STRONG].map((snr) => ({
+  snr,
+  color: coverageColor({ samples: 1, received: 1, mean_snr: snr }),
+}))
+const skySince = computed(() => (sky.value?.since ? fmtAgo(Date.now() / 1000 - sky.value.since) : null))
 const skySatellites = computed(() => (gps.value?.satellites ?? []).filter((s) => !skyUsedOnly.value || s.used))
 
 function readFlag(key: string): boolean {
@@ -261,13 +271,26 @@ const systemInfo = computed<[string, string][]>(() => {
       <div class="card">
         <div class="card-head">
           <h2>Sky view</h2>
-          <label class="toggle">
-            <input v-model="skyUsedOnly" type="checkbox" />
-            Used only
-          </label>
+          <div class="toggles">
+            <label v-if="!skyCoverage" class="toggle">
+              <input v-model="skyUsedOnly" type="checkbox" />
+              Used only
+            </label>
+            <label class="toggle">
+              <input v-model="skyCoverage" type="checkbox" />
+              Coverage ({{ sky?.hours ?? 24 }} h)
+            </label>
+          </div>
         </div>
-        <SkyPlot v-if="gps" :satellites="skySatellites" />
-        <ConstellationLegend v-if="gps" :gps="gps" />
+        <SkyPlot v-if="gps" :satellites="skySatellites" :coverage="skyCoverage ? sky : null" />
+        <div v-if="skyCoverage" class="coverage-legend sub">
+          <span>average SNR</span>
+          <span v-for="l in coverageLegend" :key="l.snr" class="swatch"><i :style="{ background: l.color }" />{{ l.snr }}</span>
+          <span>dB-Hz ·</span>
+          <span class="swatch"><i :style="{ background: coverageColor({ samples: 1, received: 0, mean_snr: null }) }" />no signal</span>
+          <span v-if="skySince">· data from the last {{ skySince }}</span>
+        </div>
+        <ConstellationLegend v-else-if="gps" :gps="gps" />
       </div>
       <div class="card">
         <div class="card-head">
@@ -432,6 +455,27 @@ button.ghost {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+.toggles {
+  display: flex;
+  gap: 12px;
+}
+.coverage-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 4px;
+}
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.swatch i {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
 }
 .clients {
   display: grid;

@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/gps/sky": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sky coverage: signal strength per 10° x 10° patch over the last SKY_HOURS
+         * @description Patches with sightings but few received ones are blocked from the antenna's view.
+         */
+        get: operations["sky_api_gps_sky_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chrony": {
         parameters: {
             query?: never;
@@ -581,6 +601,60 @@ export interface components {
             /** Ntp Hw Tx Timestamps */
             ntp_hw_tx_timestamps?: number | null;
         };
+        /** SkyCell */
+        SkyCell: {
+            /**
+             * Az
+             * @description Lower azimuth edge of the patch, degrees from true north
+             */
+            az: number;
+            /**
+             * El
+             * @description Lower elevation edge of the patch, degrees above the horizon
+             */
+            el: number;
+            /**
+             * Samples
+             * @description Satellite sightings in this patch (predicted positions included)
+             */
+            samples: number;
+            /**
+             * Received
+             * @description Sightings with a signal (SNR > 0)
+             */
+            received: number;
+            /**
+             * Mean Snr
+             * @description Average SNR of the received sightings, dBHz
+             */
+            mean_snr: number | null;
+            /**
+             * Max Snr
+             * @description Strongest SNR seen, dBHz
+             */
+            max_snr: number | null;
+        };
+        /** SkyCoverage */
+        SkyCoverage: {
+            /**
+             * Hours
+             * @description Window length (SKY_HOURS)
+             */
+            hours: number;
+            /** Az Step */
+            az_step: number;
+            /** El Step */
+            el_step: number;
+            /** Sample Interval S */
+            sample_interval_s: number;
+            /**
+             * Since
+             * @description Unix time of the oldest data in the window
+             */
+            since: number | null;
+            /** Cells */
+            cells: components["schemas"]["SkyCell"][];
+        };
         /** Source */
         Source: {
             /**
@@ -809,6 +883,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Satellite"][];
+                };
+            };
+        };
+    };
+    sky_api_gps_sky_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkyCoverage"];
                 };
             };
         };

@@ -1,5 +1,5 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue'
-import type { Client, HistoryPoint, PoolHistory, Provider, Status } from './types'
+import type { Client, HistoryPoint, PoolHistory, Provider, SkyCoverage, Status } from './types'
 
 /** Live /api/status over the WebSocket, reconnecting on loss. */
 export function useLiveStatus() {
@@ -93,6 +93,28 @@ export function useHistory(minutes: Ref<number>) {
     clearInterval(slowTimer)
   })
   return { samples, bucketSeconds, loading }
+}
+
+/** Sky coverage (sampled every 30 s by the API), fetched only while `enabled`, every minute. */
+export function useSky(enabled: Ref<boolean>) {
+  const sky = shallowRef<SkyCoverage | null>(null)
+  let timer: number | undefined
+  async function load() {
+    if (!enabled.value) return
+    try {
+      const res = await fetch('/api/gps/sky')
+      if (res.ok) sky.value = await res.json()
+    } catch (e) {
+      console.warn(e)
+    }
+  }
+  watch(enabled, load)
+  onMounted(() => {
+    load()
+    timer = window.setInterval(load, 60000)
+  })
+  onBeforeUnmount(() => clearInterval(timer))
+  return { sky }
 }
 
 /** NTP Pool scores for the last `minutes`; fetched every POOL_INTERVAL by the API, so refetch every minute. */
