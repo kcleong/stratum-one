@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { connect } from 'echarts/core'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, watchEffect } from 'vue'
 import { useClients, useHistory, useLiveStatus, usePool, useSky } from './api/live'
 import ClientsTable from './components/ClientsTable.vue'
 import ConstellationLegend from './components/ConstellationLegend.vue'
@@ -95,6 +95,15 @@ const pills = computed(() => {
 const ipv6Share = computed(() => {
   const c = chrony.value
   return c?.active_clients && c.active_clients_ipv6 != null ? (100 * c.active_clients_ipv6) / c.active_clients : null
+})
+
+// Tab title: host and role when healthy; the most serious problem first otherwise, so it shows in a background tab.
+watchEffect(() => {
+  const host = sys.value?.hostname ?? 'stratum_one'
+  const worst = pills.value.find((p) => p.level === 'critical') ?? pills.value.find((p) => p.level === 'warning')
+  document.title = worst
+    ? `${worst.level === 'critical' ? '✕' : '⚠'} ${worst.label} · ${host}`
+    : `${host} · stratum-1 NTP${tracking.value ? ` · ${tracking.value.ref_name}` : ''}`
 })
 
 const tiles = computed(() => {
