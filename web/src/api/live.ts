@@ -1,5 +1,5 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue'
-import type { Client, HistoryPoint, PoolHistory, Status } from './types'
+import type { Client, HistoryPoint, PoolHistory, Provider, Status } from './types'
 
 /** Live /api/status over the WebSocket, reconnecting on loss. */
 export function useLiveStatus() {
@@ -116,14 +116,16 @@ export function usePool(minutes: Ref<number>) {
   return { pool }
 }
 
-/** NTP clients change slowly; poll every 30 s. */
+/** NTP clients and their top providers change slowly; poll every 30 s. */
 export function useClients() {
   const clients = shallowRef<Client[]>([])
+  const providers = shallowRef<Provider[]>([])
   let timer: number | undefined
   async function load() {
     try {
-      const res = await fetch('/api/chrony/clients')
-      if (res.ok) clients.value = await res.json()
+      const [c, p] = await Promise.all([fetch('/api/chrony/clients'), fetch('/api/chrony/providers')])
+      if (c.ok) clients.value = await c.json()
+      if (p.ok) providers.value = await p.json()
     } catch (e) {
       console.warn(e)
     }
@@ -133,5 +135,5 @@ export function useClients() {
     timer = window.setInterval(load, 30000)
   })
   onBeforeUnmount(() => clearInterval(timer))
-  return { clients }
+  return { clients, providers }
 }

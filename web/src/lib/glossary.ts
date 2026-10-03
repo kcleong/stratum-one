@@ -14,7 +14,7 @@ export const INFO: Record<string, string> = {
   'Satellites used':
     'Satellites in the fix / satellites tracked. HDOP and PDOP (dilution of precision) show how satellite geometry magnifies errors, horizontally and in 3D; below about 2 is good.',
   'NTP clients':
-    'Distinct addresses that sent an NTP request in the last hour. req/s is the current request rate (averaged over 5 s); "since start" counts every address in chronyd\'s client log since it started.',
+    'Distinct addresses that sent an NTP request in the last hour, and the IPv6 share of them. req/s is the current request rate (averaged over 5 s); "since start" counts every address in chronyd\'s client log since it started.',
   'CPU temperature':
     'SoC temperature. The crystal\'s frequency follows temperature, so swings here show up in the frequency chart. "load" is the 1-minute load average.',
 
