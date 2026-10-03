@@ -13,6 +13,7 @@ from .geo import GeoLookup
 from .gpsd import GpsdClient
 from .models import HistoryPoint, HistorySample, Provider, Status
 from .pool import PoolMonitor
+from .sky import SAMPLE_S as SKY_SAMPLE_S, SkyCounter
 from .store import HistoryStore, bucket_samples
 
 log = logging.getLogger(__name__)
@@ -49,6 +50,22 @@ class Monitor:
                         settings.history_days * 86400, self.store)
             if settings.pool_servers else None
         )
+        self.sky = SkyCounter(settings.sky_hours)
+        if self.store is not None:
+            try:
+                self.sky.load(self.store.load_sky(self._sky_first_hour()))
+            except sqlite3.Error as e:
+                log.warning("sky coverage unreadable from history store: %s", e)
+
+    def _sky_first_hour(self) -> int:
+        return int(time.time() // 3600) - int(self.settings.sky_hours) + 1
+
+    async def run_sky(self) -> None:
+        while True:
+            gps = self.gps.snapshot()
+            if gps.connected:
+                self.sky.add(gps.satellites)
+            await asyncio.sleep(SKY_SAMPLE_S)
 
     async def run_chrony(self) -> None:
         while True:
@@ -95,14 +112,20 @@ class Monitor:
             return
         async with self._flush_lock:
             batch, self._unsaved = self._unsaved, []
-            if not batch:
-                return
-            try:
-                await asyncio.to_thread(self.store.write, batch)
-                log.debug("flushed %d history samples", len(batch))
-            except sqlite3.Error as e:
-                log.warning("history flush failed, will retry: %s", e)
-                self._unsaved = batch + self._unsaved
+            if batch:
+                try:
+                    await asyncio.to_thread(self.store.write, batch)
+                    log.debug("flushed %d history samples", len(batch))
+                except sqlite3.Error as e:
+                    log.warning("history flush failed, will retry: %s", e)
+                    self._unsaved = batch + self._unsaved
+            hours, self.sky.dirty = self.sky.dirty, set()
+            if hours:
+                try:
+                    await asyncio.to_thread(self.store.write_sky, self.sky.rows(hours), self._sky_first_hour())
+                except sqlite3.Error as e:
+                    log.warning("sky coverage flush failed, will retry: %s", e)
+                    self.sky.dirty |= hours
 
     def close(self) -> None:
         if self.store is not None:

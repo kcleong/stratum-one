@@ -1,5 +1,5 @@
 // Register only the ECharts pieces we use (keeps the bundle small).
-import { BarChart, LineChart, ScatterChart } from 'echarts/charts'
+import { BarChart, CustomChart, LineChart, ScatterChart } from 'echarts/charts'
 import {
   DataZoomComponent,
   GridComponent,
@@ -13,6 +13,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 
 use([
   BarChart,
+  CustomChart, // sky coverage patches
   LineChart,
   ScatterChart,
   DataZoomComponent,

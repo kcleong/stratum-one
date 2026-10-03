@@ -38,6 +38,11 @@ class HistoryStore:
         for col in COLUMNS:
             if col not in existing:   # a field added to HistorySample
                 self.db.execute(f"ALTER TABLE history ADD COLUMN {col}")
+        # Sky coverage counts per hour and 10° x 10° patch (see sky.py).
+        self.db.execute(
+            "CREATE TABLE IF NOT EXISTS sky_cells (hour INTEGER, az INTEGER, el INTEGER, n INTEGER, n_rx INTEGER,"
+            " snr_sum REAL, snr_max REAL, PRIMARY KEY (hour, az, el)) WITHOUT ROWID"
+        )
         # NTP Pool scores: a few rows per hour, written as they arrive.
         self.db.execute(
             "CREATE TABLE IF NOT EXISTS pool_scores (server TEXT, t REAL, score REAL, PRIMARY KEY (server, t)) WITHOUT ROWID"
@@ -92,6 +97,17 @@ class HistoryStore:
                 [(s.server, s.t, s.score) for s in scores],
             )
             self.db.execute("DELETE FROM pool_scores WHERE t < ?", (time.time() - self.retention_s,))
+
+    def load_sky(self, since_hour: int) -> list[tuple]:
+        with self.lock:
+            return self.db.execute(
+                "SELECT hour, az, el, n, n_rx, snr_sum, snr_max FROM sky_cells WHERE hour >= ?", (since_hour,)
+            ).fetchall()
+
+    def write_sky(self, rows: list[tuple], keep_from_hour: int) -> None:
+        with self.lock, self.db:
+            self.db.executemany("INSERT OR REPLACE INTO sky_cells VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
+            self.db.execute("DELETE FROM sky_cells WHERE hour < ?", (keep_from_hour,))
 
     def close(self) -> None:
         with self.lock:

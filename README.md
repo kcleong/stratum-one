@@ -106,6 +106,8 @@ After changing dependencies run `uv lock` in `api/`.
 - Interactive docs: `http://lobsang.local:8000/docs` (OpenAPI at `/openapi.json`)
 - `GET /api/status`: everything below in one document
 - `GET /api/gps`, `/api/gps/satellites`: fix, DOPs, per-satellite az/el/SNR
+- `GET /api/gps/sky`: sky coverage, average SNR and share received per
+  10° x 10° patch over the last `SKY_HOURS` (24), sampled every 30 s
 - `GET /api/chrony`, `/api/chrony/clients`: tracking, sources, sourcestats,
   serverstats, clients (busiest 50 plus LAN, with country and provider from the
   [DB-IP](https://db-ip.com) Lite databases, CC BY 4.0, downloaded monthly to `GEOIP_DIR`)
@@ -153,7 +155,8 @@ addresses; keep port 8000 on the LAN.
 `http://lobsang.local:8000/`: live UTC clock, lock/fix status, history charts
 of offsets, frequency, satellites, temperature, NTP load and pool score
 (1 h to 30 d, ctrl+scroll or pinch to zoom), sky
-plot, signal strength per satellite, chrony sources, NTP clients (busiest 20),
+plot (live satellites, or a 24 h coverage map showing where the antenna's
+view is open or blocked), signal strength per satellite, chrony sources, NTP clients (busiest 20),
 top client providers and host
 stats. Vue 3 + ECharts in `web/`, built into the api image by the first
 stage of `api/Dockerfile` (no Node needed on the host).

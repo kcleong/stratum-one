@@ -18,6 +18,7 @@ from .models import (
     PoolHistory,
     Provider,
     Satellite,
+    SkyCoverage,
     Status,
     SystemStatus,
 )
@@ -41,6 +42,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(monitor.run_chrony()),
         asyncio.create_task(monitor.run_clients()),
         asyncio.create_task(monitor.run_flush()),
+        asyncio.create_task(monitor.run_sky()),
     ]
     if monitor.geo is not None:
         tasks.append(asyncio.create_task(monitor.geo.run()))
@@ -80,6 +82,15 @@ def gps() -> GpsStatus:
 @app.get("/api/gps/satellites", summary="Satellites in view")
 def satellites() -> list[Satellite]:
     return _monitor().gps.snapshot().satellites
+
+
+@app.get(
+    "/api/gps/sky",
+    summary="Sky coverage: signal strength per 10° x 10° patch over the last SKY_HOURS",
+    description="Patches with sightings but few received ones are blocked from the antenna's view.",
+)
+def sky() -> SkyCoverage:
+    return _monitor().sky.coverage()
 
 
 @app.get("/api/chrony", summary="chrony tracking, sources, sourcestats, serverstats")
