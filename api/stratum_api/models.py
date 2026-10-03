@@ -168,6 +168,7 @@ class ChronyStatus(BaseModel):
     serverstats: ServerStats | None
     activity: Activity | None
     client_count: int = Field(description="Clients in chronyd's client log (since start, bounded by clientloglimit)")
+    active_clients: int | None = Field(description="Clients with an NTP request in the last hour; null until the first clients poll")
     ntp_requests_per_s: float | None = Field(description="NTP requests per second over the last poll interval")
 
 
@@ -201,6 +202,7 @@ class HistorySample(BaseModel):
     satellites_used: int
     satellites_visible: int
     cpu_temp_c: float | None
+    ntp_requests_per_s: float | None = None   # added later: NULL in older rows
 
 
 class HistoryPoint(HistorySample):
@@ -214,6 +216,21 @@ class HistoryPoint(HistorySample):
     system_time_offset_max_s: float | None = None
     pps_offset_min_s: float | None = None
     pps_offset_max_s: float | None = None
+
+
+# --- NTP Pool ---
+
+
+class PoolScore(BaseModel):
+    t: float = Field(description="Unix time the score was fetched")
+    server: str = Field(description="Server address as configured in POOL_SERVERS")
+    score: float = Field(description="Overall pool score (recent median of the monitors); > 10 is in the pool DNS")
+
+
+class PoolHistory(BaseModel):
+    servers: list[str] = Field(description="POOL_SERVERS; empty when pool tracking is off")
+    interval_s: float = Field(description="Seconds between score fetches")
+    scores: list[PoolScore]
 
 
 class Health(BaseModel):

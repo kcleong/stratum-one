@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { connect } from 'echarts/core'
 import { computed, ref, watch } from 'vue'
-import { useClients, useHistory, useLiveStatus } from './api/live'
+import { useClients, useHistory, useLiveStatus, usePool } from './api/live'
 import ClientsTable from './components/ClientsTable.vue'
 import ConstellationLegend from './components/ConstellationLegend.vue'
 import HistoryChart, { type Series } from './components/HistoryChart.vue'
@@ -31,6 +31,7 @@ const RANGES = [
 const minutes = ref(60)
 const { samples, bucketSeconds, loading } = useHistory(minutes)
 const { clients } = useClients()
+const { pool } = usePool(minutes)
 
 const gps = computed(() => status.value?.gps)
 
@@ -97,8 +98,8 @@ const tiles = computed(() => {
     },
     {
       label: 'NTP clients',
-      value: fmtNum(chrony.value?.client_count),
-      sub: `${fmtNum(chrony.value?.ntp_requests_per_s, 1)} req/s · ${fmtNum(chrony.value?.serverstats?.ntp_packets_received)} total`,
+      value: fmtNum(chrony.value?.active_clients),
+      sub: `${fmtNum(chrony.value?.ntp_requests_per_s, 1)} req/s · ${fmtNum(chrony.value?.client_count)} since start`,
     },
     { label: 'CPU temperature', value: fmtNum(s?.cpu_temp_c, 1, ' °C'), sub: `load ${fmtNum(s?.load?.[0], 2)}` },
   ].map((tile) => ({ ...tile, info: INFO[tile.label] }))
@@ -133,7 +134,28 @@ const hist = computed(() => {
       { name: 'Visible', data: at((s) => s.satellites_visible), step: true, dashed: true },
     ] as Series[],
     temperature: [{ name: 'CPU temperature', slot: 1, data: at((s) => s.cpu_temp_c) }] as Series[],
+    load: [{ name: 'NTP requests', slot: 1, data: at((s) => s.ntp_requests_per_s ?? null) }] as Series[],
   }
+})
+
+// One line per POOL_SERVERS address, plus the DNS threshold across the history range
+// (which also pins the x extent, so zoom stays in step with the other charts).
+const POOL_DNS_SCORE = 10
+const poolSeries = computed(() => {
+  const p = pool.value
+  if (!p?.servers.length) return null
+  const h = samples.value
+  const first = h[0]?.t ?? p.scores[0]?.t
+  const last = h.at(-1)?.t ?? p.scores.at(-1)?.t
+  const span = first != null && last != null ? [first * 1000, last * 1000] : []
+  return [
+    ...p.servers.map((server, i) => ({
+      name: server,
+      slot: i + 1,
+      data: p.scores.filter((s) => s.server === server).map((s) => [s.t * 1000, s.score] as [number, number]),
+    })),
+    { name: 'Pool DNS threshold', dashed: true, data: span.map((x) => [x, POOL_DNS_SCORE] as [number, number]) },
+  ] as Series[]
 })
 
 const resolution = computed(() => {
@@ -224,6 +246,8 @@ const systemInfo = computed<[string, string][]>(() => {
       <HistoryChart title="Oscillator frequency" unit="ppm" :series="hist.frequency" :digits="3" :dimmed="loading" />
       <HistoryChart title="Satellites" unit="sats" :series="hist.satellites" :digits="0" include-zero :dimmed="loading" />
       <HistoryChart title="CPU temperature" unit="°C" :series="hist.temperature" :digits="1" :dimmed="loading" />
+      <HistoryChart title="NTP load" unit="req/s" :series="hist.load" :digits="1" include-zero :dimmed="loading" />
+      <HistoryChart v-if="poolSeries" title="NTP Pool score" unit="score" :series="poolSeries" :digits="1" include-zero :dimmed="loading" />
     </section>
 
     <section class="gnss">

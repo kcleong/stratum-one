@@ -110,9 +110,11 @@ After changing dependencies run `uv lock` in `api/`.
   serverstats, clients (busiest 50 plus LAN, with country and provider from the
   [DB-IP](https://db-ip.com) Lite databases, CC BY 4.0, downloaded monthly to `GEOIP_DIR`)
 - `GET /api/system`: CPU temperature, load, uptime, memory
-- `GET /api/history?minutes=60`: offsets, frequency, satellites and
-  temperature; raw 5 s samples up to 24 h, bucket averages with offset
-  min/max up to 30 days (see History below)
+- `GET /api/history?minutes=60`: offsets, frequency, satellites,
+  temperature and NTP request rate; raw 5 s samples up to 24 h, bucket
+  averages with offset min/max up to 30 days (see History below)
+- `GET /api/pool?minutes=60`: NTP Pool score history of `POOL_SERVERS` (see
+  NTP Pool score below)
 - `WS /api/ws?interval=1`: pushes `/api/status` every second
 - `GET /healthz`: 503 when gpsd or chronyd is unreachable
 
@@ -133,13 +135,22 @@ regardless of retention. Ranges over 24 h are served as ≤ ~1500 bucket
 averages with offset min/max (finished buckets are cached). Long-term history
 lives in Home Assistant's recorder via MQTT.
 
+**NTP Pool score**: set `POOL_SERVERS` in `.env` to the addresses registered
+in the pool (comma-separated, e.g. `POOL_SERVERS=192.0.2.10,2001:db8::123`).
+Every `POOL_INTERVAL` seconds (900) the api fetches each address's overall
+score (the pool's "recentmedian" of its monitors) from
+`https://www.ntppool.org/scores/<address>/json` and keeps it for
+`HISTORY_DAYS` in the same SQLite file. Leave it unset to disable; the
+dashboard then hides the chart.
+
 The API has no authentication and shows the GPS position and NTP client
 addresses; keep port 8000 on the LAN.
 
 ### Dashboard
 
-`http://lobsang.local:8000/`: live UTC clock, lock/fix status, offsets,
-frequency, satellite history charts (15 min to 24 h, ctrl+scroll or pinch to zoom), sky
+`http://lobsang.local:8000/`: live UTC clock, lock/fix status, history charts
+of offsets, frequency, satellites, temperature, NTP load and pool score
+(1 h to 30 d, ctrl+scroll or pinch to zoom), sky
 plot, signal strength per satellite, chrony sources, NTP clients and host
 stats. Vue 3 + ECharts in `web/`, built into the api image by the first
 stage of `api/Dockerfile` (no Node needed on the host).

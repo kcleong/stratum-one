@@ -1,5 +1,5 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue'
-import type { Client, HistoryPoint, Status } from './types'
+import type { Client, HistoryPoint, PoolHistory, Status } from './types'
 
 /** Live /api/status over the WebSocket, reconnecting on loss. */
 export function useLiveStatus() {
@@ -93,6 +93,27 @@ export function useHistory(minutes: Ref<number>) {
     clearInterval(slowTimer)
   })
   return { samples, bucketSeconds, loading }
+}
+
+/** NTP Pool scores for the last `minutes`; fetched every POOL_INTERVAL by the API, so refetch every minute. */
+export function usePool(minutes: Ref<number>) {
+  const pool = shallowRef<PoolHistory | null>(null)
+  let timer: number | undefined
+  async function load() {
+    try {
+      const res = await fetch(`/api/pool?minutes=${minutes.value}`)
+      if (res.ok) pool.value = await res.json()
+    } catch (e) {
+      console.warn(e)
+    }
+  }
+  watch(minutes, load)
+  onMounted(() => {
+    load()
+    timer = window.setInterval(load, 60000)
+  })
+  onBeforeUnmount(() => clearInterval(timer))
+  return { pool }
 }
 
 /** NTP clients change slowly; poll every 30 s. */
