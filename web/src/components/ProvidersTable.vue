@@ -39,8 +39,15 @@ const providerTitle = (p: Provider) =>
           </td>
           <td class="r">{{ fmtNum(p.clients) }}</td>
           <td class="share">
-            <span class="track" aria-hidden="true"><span class="bar" :style="{ width: `${p.share ?? 0}%` }" /></span>
-            <span class="num">{{ fmtNum(p.share, 1, ' %') }}</span>
+            <!-- Percentage on hover; the bar alone shows the distribution. -->
+            <span
+              class="track"
+              role="img"
+              :title="`${fmtNum(p.share, 1, ' %')} of active clients`"
+              :aria-label="`${fmtNum(p.share, 1, ' %')} of active clients`"
+            >
+              <span class="bar" :style="{ width: `${p.share ?? 0}%` }" />
+            </span>
           </td>
         </tr>
       </tbody>
@@ -58,16 +65,13 @@ const providerTitle = (p: Provider) =>
   margin-right: 6px;
 }
 .share {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 14ch;
+  min-width: 12ch;
 }
 /* Fixed-width track so bar lengths compare across rows (100 % = all active clients). */
 .track {
-  display: inline-block;
-  width: 8ch;
-  flex: none;
+  display: block;
+  width: 12ch;
+  padding: 4px 0; /* taller hover target than the 8 px bar */
 }
 .bar {
   display: block;
