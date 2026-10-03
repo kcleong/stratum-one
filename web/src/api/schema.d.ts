@@ -114,10 +114,30 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Time series of offsets, frequency, satellites and temperature
+         * Time series of offsets, frequency, satellites, temperature and NTP request rate
          * @description Up to HISTORY_HOURS (24 h): raw 5 s samples. Longer, up to HISTORY_DAYS (30 d): bucket averages of at most ~1500 points with offset min/max. The `X-History-Bucket-Seconds` header gives the resolution.
          */
         get: operations["history_api_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pool": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * NTP Pool score history of the POOL_SERVERS addresses
+         * @description One score per address every POOL_INTERVAL seconds, kept for HISTORY_DAYS. Empty when POOL_SERVERS is unset.
+         */
+        get: operations["pool_api_pool_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -188,6 +208,11 @@ export interface components {
              * @description Clients in chronyd's client log (since start, bounded by clientloglimit)
              */
             client_count: number;
+            /**
+             * Active Clients
+             * @description Clients with an NTP request in the last hour; null until the first clients poll
+             */
+            active_clients: number | null;
             /**
              * Ntp Requests Per S
              * @description NTP requests per second over the last poll interval
@@ -384,6 +409,8 @@ export interface components {
             satellites_visible: number;
             /** Cpu Temp C */
             cpu_temp_c: number | null;
+            /** Ntp Requests Per S */
+            ntp_requests_per_s?: number | null;
             /** System Time Offset Min S */
             system_time_offset_min_s?: number | null;
             /** System Time Offset Max S */
@@ -392,6 +419,39 @@ export interface components {
             pps_offset_min_s?: number | null;
             /** Pps Offset Max S */
             pps_offset_max_s?: number | null;
+        };
+        /** PoolHistory */
+        PoolHistory: {
+            /**
+             * Servers
+             * @description POOL_SERVERS; empty when pool tracking is off
+             */
+            servers: string[];
+            /**
+             * Interval S
+             * @description Seconds between score fetches
+             */
+            interval_s: number;
+            /** Scores */
+            scores: components["schemas"]["PoolScore"][];
+        };
+        /** PoolScore */
+        PoolScore: {
+            /**
+             * T
+             * @description Unix time the score was fetched
+             */
+            t: number;
+            /**
+             * Server
+             * @description Server address as configured in POOL_SERVERS
+             */
+            server: string;
+            /**
+             * Score
+             * @description Overall pool score (recent median of the monitors); > 10 is in the pool DNS
+             */
+            score: number;
         };
         /** Satellite */
         Satellite: {
@@ -778,6 +838,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryPoint"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pool_api_pool_get: {
+        parameters: {
+            query?: {
+                minutes?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolHistory"];
                 };
             };
             /** @description Validation Error */

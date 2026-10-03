@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .models import HistoryPoint, HistorySample
+from .models import HistoryPoint, HistorySample, PoolScore
 
 COLUMNS = list(HistorySample.model_fields)   # t first; the schema follows the model
 VALUES = COLUMNS[1:]
@@ -38,6 +38,10 @@ class HistoryStore:
         for col in COLUMNS:
             if col not in existing:   # a field added to HistorySample
                 self.db.execute(f"ALTER TABLE history ADD COLUMN {col}")
+        # NTP Pool scores: a few rows per hour, written as they arrive.
+        self.db.execute(
+            "CREATE TABLE IF NOT EXISTS pool_scores (server TEXT, t REAL, score REAL, PRIMARY KEY (server, t)) WITHOUT ROWID"
+        )
         self.db.commit()
 
     def load(self, since: float) -> list[HistorySample]:
@@ -73,6 +77,21 @@ class HistoryStore:
         with self.lock:
             rows = self.db.execute(sql, {"b": bucket_s, "since": since, "until": until}).fetchall()
         return [_point(row[0] * bucket_s + bucket_s / 2, row[1:]) for row in rows]
+
+    def load_pool(self, since: float) -> list[PoolScore]:
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT t, server, score FROM pool_scores WHERE t >= ? ORDER BY t", (since,)
+            ).fetchall()
+        return [PoolScore(t=t, server=server, score=score) for t, server, score in rows]
+
+    def write_pool(self, scores: list[PoolScore]) -> None:
+        with self.lock, self.db:
+            self.db.executemany(
+                "INSERT OR REPLACE INTO pool_scores (server, t, score) VALUES (?, ?, ?)",
+                [(s.server, s.t, s.score) for s in scores],
+            )
+            self.db.execute("DELETE FROM pool_scores WHERE t < ?", (time.time() - self.retention_s,))
 
     def close(self) -> None:
         with self.lock:

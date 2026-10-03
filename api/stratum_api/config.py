@@ -17,6 +17,9 @@ class Settings:
     history_db: str | None     # SQLite path; history is memory-only when unset
     history_flush_minutes: float
     geoip_dir: str | None      # DB-IP Lite country/ASN databases for client lookups; unset = off
+    pool_servers: tuple[str, ...]  # addresses registered in the NTP Pool; empty = no pool score tracking
+    pool_interval: float       # seconds between pool score fetches
+    pool_url: str              # NTP Pool site serving /scores/<ip>/json
     node_id: str               # device name in HA and MQTT topics
     mqtt_host: str | None      # MQTT disabled when unset
     mqtt_port: int
@@ -42,6 +45,9 @@ def load_settings() -> Settings:
         history_db=env("HISTORY_DB", "/data/history.db") or None,
         history_flush_minutes=float(env("HISTORY_FLUSH_MINUTES", "15")),
         geoip_dir=env("GEOIP_DIR", "/data/geoip") or None,
+        pool_servers=tuple(env("POOL_SERVERS", "").replace(",", " ").split()),
+        pool_interval=float(env("POOL_INTERVAL", "900")),
+        pool_url=env("POOL_URL", "https://www.ntppool.org").rstrip("/"),
         node_id=env("NODE_ID") or socket.gethostname(),
         mqtt_host=env("MQTT_HOST") or None,
         mqtt_port=int(env("MQTT_PORT", "1883")),

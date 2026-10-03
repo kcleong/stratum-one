@@ -42,6 +42,7 @@ SERVERSTATS_FIELDS = (
 UNSET_INTERVAL = 127        # clients: interval not known yet
 UNSET_LAST = 4294967295     # clients: never seen
 CLIENTS_TOP = 50            # busiest clients kept; a public pool server sees tens of thousands
+ACTIVE_WINDOW_S = 3600      # a client counts as active with an NTP request this recent
 
 
 class ChronycError(Exception):
@@ -177,6 +178,7 @@ class ChronyMonitor:
         self.activity: Activity | None = None
         self.clients: list[Client] = []
         self.client_count = 0
+        self.active_clients: int | None = None
         self.ntp_requests_per_s: float | None = None
         self._last_rx: tuple[float, int] | None = None   # (monotonic time, ntp_packets_received)
         self.error: str | None = None
@@ -230,7 +232,7 @@ class ChronyMonitor:
         A public pool server's client log holds up to clientloglimit worth of rows (hundreds of
         thousands), so rows are streamed and only a small heap is ever held in memory.
         """
-        count = 0
+        count = active = 0
         busiest: list[tuple[int, int, list[str]]] = []   # min-heap of (ntp_packets, seq, row)
         lan: list[list[str]] = []
         try:
@@ -238,6 +240,8 @@ class ChronyMonitor:
                 for row in rows:
                     count += 1
                     packets = int(row[1])
+                    if packets and (last := _int(row[5], UNSET_LAST)) is not None and last <= ACTIVE_WINDOW_S:
+                        active += 1
                     if _is_lan(row[0]):
                         lan.append(row)
                     elif len(busiest) < CLIENTS_TOP:
@@ -250,6 +254,7 @@ class ChronyMonitor:
             log.warning("chrony clients: %s", e)
             return
         self.client_count = count
+        self.active_clients = active
         self.clients = clients
 
     @property
@@ -273,6 +278,7 @@ class ChronyMonitor:
             serverstats=self.serverstats,
             activity=self.activity,
             client_count=self.client_count,
+            active_clients=self.active_clients,
             ntp_requests_per_s=self.ntp_requests_per_s,
         )
 

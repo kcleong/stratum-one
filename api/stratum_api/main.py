@@ -15,6 +15,7 @@ from .models import (
     Health,
     HistoryPoint,
     HistorySample,
+    PoolHistory,
     Satellite,
     Status,
     SystemStatus,
@@ -42,6 +43,10 @@ async def lifespan(app: FastAPI):
     ]
     if monitor.geo is not None:
         tasks.append(asyncio.create_task(monitor.geo.run()))
+    if monitor.pool is not None:
+        tasks.append(asyncio.create_task(monitor.pool.run()))
+    else:
+        log.info("POOL_SERVERS not set, NTP Pool score tracking disabled")
     if settings.mqtt_host:
         tasks.append(asyncio.create_task(MqttPublisher(settings, monitor).run()))
     else:
@@ -93,7 +98,7 @@ def system() -> SystemStatus:
 
 @app.get(
     "/api/history",
-    summary="Time series of offsets, frequency, satellites and temperature",
+    summary="Time series of offsets, frequency, satellites, temperature and NTP request rate",
     description=(
         "Up to HISTORY_HOURS (24 h): raw 5 s samples. Longer, up to HISTORY_DAYS (30 d): bucket "
         "averages of at most ~1500 points with offset min/max. The `X-History-Bucket-Seconds` "
@@ -113,6 +118,22 @@ async def history(minutes: float = Query(60, gt=0, le=MAX_HISTORY_MINUTES)) -> R
         bucket, points = await monitor.history_buckets(seconds)
         body = HISTORY_BUCKET_JSON.dump_json(points)
     return Response(body, media_type="application/json", headers={"X-History-Bucket-Seconds": f"{bucket:g}"})
+
+
+@app.get(
+    "/api/pool",
+    summary="NTP Pool score history of the POOL_SERVERS addresses",
+    description="One score per address every POOL_INTERVAL seconds, kept for HISTORY_DAYS. Empty when POOL_SERVERS is unset.",
+)
+def pool(minutes: float = Query(60, gt=0, le=MAX_HISTORY_MINUTES)) -> PoolHistory:
+    monitor = _monitor()
+    if monitor.pool is None:
+        return PoolHistory(servers=[], interval_s=monitor.settings.pool_interval, scores=[])
+    return PoolHistory(
+        servers=list(monitor.pool.servers),
+        interval_s=monitor.pool.interval_s,
+        scores=monitor.pool.since(minutes * 60),
+    )
 
 
 @app.get(

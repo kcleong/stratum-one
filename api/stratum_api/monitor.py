@@ -12,6 +12,7 @@ from .config import Settings
 from .geo import GeoLookup
 from .gpsd import GpsdClient
 from .models import HistoryPoint, HistorySample, Status
+from .pool import PoolMonitor
 from .store import HistoryStore, bucket_samples
 
 log = logging.getLogger(__name__)
@@ -41,6 +42,11 @@ class Monitor:
             except (sqlite3.Error, OSError) as e:
                 log.error("history store %s unusable, keeping history in memory only: %s", settings.history_db, e)
                 self.store = None
+        self.pool = (
+            PoolMonitor(settings.pool_servers, settings.pool_interval, settings.pool_url,
+                        settings.history_days * 86400, self.store)
+            if settings.pool_servers else None
+        )
 
     async def run_chrony(self) -> None:
         while True:
@@ -100,6 +106,7 @@ class Monitor:
             satellites_used=gps.satellites_used,
             satellites_visible=gps.satellites_visible,
             cpu_temp_c=system.snapshot().cpu_temp_c,
+            ntp_requests_per_s=self.chrony.ntp_requests_per_s,
         )
         self.history.append(sample)
         if self.store is not None:
