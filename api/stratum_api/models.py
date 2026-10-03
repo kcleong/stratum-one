@@ -160,6 +160,7 @@ class Client(BaseModel):
 class Provider(BaseModel):
     asn: int | None = Field(description="Autonomous system number (DB-IP Lite); null = not in the database")
     asn_org: str | None = Field(description="Provider owning that network")
+    country: str | None = Field(description="Most common ISO 3166 country code among those clients (DB-IP Lite)")
     clients: int = Field(description="Public clients of this provider active in the last hour")
     ntp_packets: int = Field(description="NTP requests from those clients since chronyd started")
 
