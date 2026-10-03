@@ -1,1 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="none" stroke="#2a78d6" stroke-width="3"/><path d="M16 8v8l5 3" fill="none" stroke="#2a78d6" stroke-width="3" stroke-linecap="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- A GPS satellite beaming time down to lobsang (dashboard series colours). -->
+  <g transform="rotate(-45 12 12)">
+    <rect x="-1" y="9" width="8" height="6" rx="1" fill="#2a78d6"/>
+    <rect x="17" y="9" width="8" height="6" rx="1" fill="#2a78d6"/>
+    <path d="M3 9v6M21 9v6" stroke="#fff" stroke-opacity=".55" stroke-width="1"/>
+    <path d="M7 12h2M15 12h2" stroke="#8a94a6" stroke-width="1.5"/>
+    <rect x="9" y="7.5" width="6" height="9" rx="1.5" fill="#eb6834"/>
+    <path d="M12 16.5v2.5" stroke="#8a94a6" stroke-width="1.5"/>
+    <circle cx="12" cy="20" r="1.6" fill="#8a94a6"/>
+  </g>
+  <path d="M24.7 17.9A14 14 0 0 1 17.9 24.7M29.2 20A19 19 0 0 1 20 29.2" fill="none" stroke="#1baf7a" stroke-width="2.6" stroke-linecap="round"/>
+</svg>
