@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import VChart from 'vue-echarts'
+import { joinHistory } from '../lib/historySync'
 import { useTokens } from '../lib/theme'
 
 export interface Series {
@@ -9,6 +10,8 @@ export interface Series {
   data: [number, number | null][] // [ms, value]
   dashed?: boolean
   step?: boolean
+  /** leave out of the tooltip (e.g. a constant reference line, whose sparse points would win the nearest-in-time match) */
+  noTip?: boolean
   /** min/max per point (bucket-averaged ranges), drawn as a shaded band behind the line */
   band?: { min: (number | null)[]; max: (number | null)[] }
 }
@@ -27,6 +30,19 @@ const props = defineProps<{
 }>()
 
 const tokens = useTokens()
+
+// Shared crosshair and zoom with the other history charts (see lib/historySync).
+const chartRef = ref<InstanceType<typeof VChart>>()
+let leave: (() => void) | undefined
+watch(
+  () => chartRef.value?.chart,
+  (chart) => {
+    leave?.()
+    leave = chart ? joinHistory(chart) : undefined
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => leave?.())
 
 const option = computed(() => {
   const t = tokens.value
@@ -103,6 +119,7 @@ const option = computed(() => {
           lineStyle: { width: 2, color: color(s), type: s.dashed ? 'dashed' : 'solid' },
           itemStyle: { color: color(s) },
           emphasis: { disabled: true },
+          tooltip: s.noTip ? { show: false } : undefined,
           z: 3,
         }
       // Band = invisible base at min, stacked with (max - min) filled on top.
@@ -137,7 +154,7 @@ const option = computed(() => {
       <h2>{{ title }}</h2>
       <span class="sub" title="ctrl+scroll or pinch to zoom">{{ unit }}<template v-if="range"> · {{ range }}</template></span>
     </div>
-    <VChart class="chart" :option="option" group="history" autoresize />
+    <VChart ref="chartRef" class="chart" :option="option" autoresize />
   </section>
 </template>
 

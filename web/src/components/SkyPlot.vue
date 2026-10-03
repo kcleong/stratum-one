@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import VChart from 'vue-echarts'
 import type { Satellite, SkyCoverage } from '../api/types'
 import { CONSTELLATIONS, satLabel } from '../lib/gnss'
-import { coverageColor } from '../lib/sky'
+import { BLOCKED_BELOW, coverageColor } from '../lib/sky'
 import { useTokens } from '../lib/theme'
 
 const props = defineProps<{ satellites: Satellite[]; coverage?: SkyCoverage | null }>()
@@ -12,7 +12,6 @@ const COMPASS: Record<number, string> = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' }
 
 const option = computed(() => {
   const t = tokens.value
-  const placed = props.satellites.filter((s) => s.elevation != null && s.azimuth != null && s.elevation >= 0)
   return {
     animation: false,
     polar: { radius: ['0%', '82%'] },
@@ -44,13 +43,16 @@ const option = computed(() => {
       borderColor: t.grid,
       textStyle: { color: t.ink, fontSize: 12 },
     },
-    series: props.coverage ? [coverageSeries(props.coverage, t.ink2)] : satelliteSeries(placed, t),
+    // Coverage must not read props.satellites: they change every second, and each rebuild of the
+    // custom series drops the tooltip under the mouse.
+    series: props.coverage ? [coverageSeries(props.coverage, t.ink2)] : satelliteSeries(props.satellites, t),
   }
 })
 
 type Tokens = (typeof tokens)['value']
 
-function satelliteSeries(placed: Satellite[], t: Tokens) {
+function satelliteSeries(satellites: Satellite[], t: Tokens) {
+  const placed = satellites.filter((s) => s.elevation != null && s.azimuth != null && s.elevation >= 0)
   return CONSTELLATIONS.map((c) => {
     const color = t.series(c.slot)
     return {
@@ -120,6 +122,7 @@ function coverageSeries(cov: SkyCoverage, ink2: string) {
         const pct = Math.round((100 * c.received) / c.samples)
         return `<b>az ${c.az}–${c.az + cov.az_step}° · el ${c.el}–${c.el + cov.el_step}°</b><br>
           ${c.mean_snr != null ? `average SNR <b>${c.mean_snr}</b> dB-Hz (max ${c.max_snr})` : '<b>no signal</b>'}<br>
+          ${c.received / c.samples < BLOCKED_BELOW ? '<b>blocked</b>: the antenna mostly misses this part of the sky<br>' : ''}
           <span style="color:${ink2}">${pct}% of ${c.samples} sightings received</span>`
       },
     },
