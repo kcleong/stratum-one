@@ -153,11 +153,9 @@ const hist = computed(() => {
         band: band((s) => s.pps_offset_min_s, (s) => s.pps_offset_max_s),
       },
     ] as Series[],
+    // chrony's long-term average of |offset|: one smooth jitter trend for before/after comparisons.
+    rms: [{ name: 'RMS offset', slot: 1, data: at((s) => us(s.rms_offset_s)) }] as Series[],
     frequency: [{ name: 'Frequency', slot: 1, data: at((s) => s.frequency_ppm) }] as Series[],
-    satellites: [
-      { name: 'Used', slot: 1, data: at((s) => s.satellites_used), step: true },
-      { name: 'Visible', data: at((s) => s.satellites_visible), step: true, dashed: true },
-    ] as Series[],
     temperature: [{ name: 'CPU temperature', slot: 1, data: at((s) => s.cpu_temp_c) }] as Series[],
     load: [
       { name: 'NTP requests', slot: 1, data: at((s) => s.ntp_requests_per_s ?? null) },
@@ -277,7 +275,7 @@ const systemInfo = computed<[string, string][]>(() => {
       <div class="charts">
         <HistoryChart title="Clock offset" unit="µs" :range="rangeLabel" :series="hist.offset" include-zero :dimmed="loading" />
         <HistoryChart title="Oscillator frequency" unit="ppm" :range="rangeLabel" :series="hist.frequency" :digits="3" :dimmed="loading" />
-        <HistoryChart title="Satellites" unit="sats" :range="rangeLabel" :series="hist.satellites" :digits="0" include-zero :dimmed="loading" />
+        <HistoryChart title="RMS offset" unit="µs" :range="rangeLabel" :series="hist.rms" :digits="3" log-scale :dimmed="loading" />
         <HistoryChart title="CPU temperature" unit="°C" :range="rangeLabel" :series="hist.temperature" :digits="1" :dimmed="loading" />
         <HistoryChart title="NTP load" unit="req/s" :range="rangeLabel" :series="hist.load" :digits="1" include-zero :dimmed="loading" />
         <HistoryChart

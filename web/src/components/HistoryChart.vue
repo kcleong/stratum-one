@@ -24,6 +24,8 @@ const props = defineProps<{
   series: Series[]
   digits?: number
   includeZero?: boolean
+  /** log y-axis, for positive values spanning decades (e.g. RMS offset: ~0.1 µs normally, ms after a restart) */
+  logScale?: boolean
   dimmed?: boolean
   /** selected history range, e.g. "last 24 h" */
   range?: string
@@ -100,7 +102,7 @@ const option = computed(() => {
       splitLine: { show: false },
     },
     yAxis: {
-      type: 'value',
+      type: props.logScale ? 'log' : 'value',
       scale: !props.includeZero,
       axisLabel: { color: t.muted, fontSize: 11, formatter: (v: number) => `${+v.toFixed(3)}` },
       splitLine: { lineStyle: { color: t.grid } },
