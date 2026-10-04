@@ -1,4 +1,13 @@
 # GPS/PPS-disciplined stratum-1 NTP server. See README.md for host prep.
+
+# Container logs live on the SD card; cap them. chrony and gpsd get `logging: *logging`
+# at their next planned recreate (a chrony recreate costs pool score).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 services:
   chrony:
     build:
@@ -60,6 +69,7 @@ services:
     depends_on: [chrony, gpsd]
     cpus: 1.0                        # runaway guard; chronyd runs at RT priority anyway
     mem_limit: 192m                  # ~60 MiB with 24 h history + headroom for requests
+    logging: *logging
     restart: unless-stopped
     healthcheck:                     # HTTP server responsive and gpsd + chronyd reachable (503 otherwise)
       test: ["CMD-SHELL", "wget -q -O /dev/null -T 5 http://127.0.0.1:$${API_PORT:-8000}/healthz"]
