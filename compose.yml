@@ -1,12 +1,10 @@
 # GPS/PPS-disciplined stratum-1 NTP server. See README.md for host prep.
 
-# Container logs live on the SD card; cap them. chrony and gpsd get `logging: *logging`
-# at their next planned recreate (a chrony recreate costs pool score).
+# Container logs to journald, which is volatile on Pi OS: nothing on the SD card.
+# chrony and gpsd get `logging: *logging` at their next planned recreate
+# (a chrony recreate costs pool score).
 x-logging: &logging
-  driver: json-file
-  options:
-    max-size: 10m
-    max-file: "3"
+  driver: journald
 
 services:
   chrony:

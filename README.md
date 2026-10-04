@@ -63,9 +63,18 @@ Give the antenna a clear sky view; first fix can take several minutes.
    sudo usermod -aG docker $USER   # re-login afterwards
    ```
 
-6. **Reboot**, then verify:
+6. **PPS keeps CPU0 to itself**: the PPS timestamp is taken in its hard IRQ on
+   CPU0 (chained through the GPIO controller, so it cannot move). Move the eth0
+   IRQs to CPU2:
+   ```
+   sudo cp host/eth0-irq-affinity.service /etc/systemd/system/
+   sudo systemctl enable --now eth0-irq-affinity
+   ```
+
+7. **Reboot**, then verify:
    ```
    ls -l /dev/pps0 /dev/ttyAMA2
+   grep -E "eth0|pps" /proc/interrupts      # eth0 counts grow on CPU2, pps on CPU0
    grep memory /sys/fs/cgroup/cgroup.controllers
    sudo apt install pps-tools && sudo ppstest /dev/pps0   # one line per second once GPS has a fix
    ```

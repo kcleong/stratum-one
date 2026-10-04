@@ -1,0 +1,15 @@
+# Keeps CPU0 free for the PPS interrupt: eth0 IRQs go to CPU2.
+# The PPS IRQ is chained through the GPIO controller and stays on CPU0; its
+# timestamp is taken in the hard IRQ, so a network IRQ on CPU0 can delay it.
+[Unit]
+Description=Move eth0 IRQs to CPU2 (PPS keeps CPU0)
+After=sys-subsystem-net-devices-eth0.device
+Wants=sys-subsystem-net-devices-eth0.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c "for i in $(awk '/ eth0$/ {sub(\":\", \"\", $1); print $1}' /proc/interrupts); do echo 2 > /proc/irq/$i/smp_affinity_list; done"
+
+[Install]
+WantedBy=multi-user.target
