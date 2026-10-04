@@ -245,7 +245,8 @@ export interface components {
          * @description A stretch of NTP load at or above BURST_REQ_S, with the clients active during it.
          *
          *     The client part is the last scan taken while the burst lasted (rescanned every minute),
-         *     so counters have built up as far as possible.
+         *     so counters have built up as far as possible. A burst over before its first scan is
+         *     scanned once as it ends.
          */
         Burst: {
             /**

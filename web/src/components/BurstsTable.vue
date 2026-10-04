@@ -35,7 +35,7 @@ const clientTitle = (c: BurstClient) =>
           <span :title="`Addresses with a request in the ${b.window_s} s before the scan`">{{ fmtNum(b.clients) }} clients ({{ fmtNum(b.clients_ipv6) }} IPv6)</span>
         </span>
       </summary>
-      <p v-if="b.scanned == null" class="sub pending">Client scan pending.</p>
+      <p v-if="b.scanned == null" class="sub pending">{{ b.end ? 'No client scan for this burst.' : 'Client scan pending.' }}</p>
       <div v-else class="detail">
         <div class="table-scroll">
           <table>

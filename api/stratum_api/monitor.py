@@ -127,7 +127,8 @@ class Monitor:
             stats = self.chrony.serverstats
             if stats and rx0 is not None and stats.ntp_packets_received >= rx0:
                 update |= {"ntp_packets": stats.ntp_packets_received - rx0, "ntp_dropped": stats.ntp_packets_dropped - drop0}
-            if not ended and time.monotonic() >= next_scan:
+            # A burst over before its first scan still gets one: the window reaches back past its start.
+            if (not ended and time.monotonic() >= next_scan) or (ended and burst.scanned is None):
                 next_scan = time.monotonic() + BURST_RESCAN_S
                 update |= await self._scan_burst()
             if ended:
