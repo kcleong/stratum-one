@@ -233,15 +233,15 @@ const systemInfo = computed<[string, string][]>(() => {
   <header>
     <div class="brand">
       <strong>{{ sys?.hostname ?? 'stratum_one' }}</strong>
-      <span class="sub">GPS/PPS stratum-1 NTP</span>
+      <span class="sub wide">GPS/PPS stratum-1 NTP</span>
     </div>
     <div class="pills">
       <StatusPill v-for="p in pills" :key="p.label" v-bind="p" />
     </div>
     <nav>
       <a href="/docs" target="_blank" rel="noopener">API</a>
-      <button type="button" class="ghost" :title="`Theme: ${themePref}`" @click="cycleTheme">
-        {{ themePref === 'auto' ? '◐' : themePref === 'light' ? '☀' : '☾' }} {{ themePref }}
+      <button type="button" class="ghost" :title="`Theme: ${themePref}`" :aria-label="`Theme: ${themePref}`" @click="cycleTheme">
+        {{ themePref === 'auto' ? '◐' : themePref === 'light' ? '☀' : '☾' }}<span class="wide"> {{ themePref }}</span>
       </button>
     </nav>
   </header>
@@ -380,15 +380,15 @@ const systemInfo = computed<[string, string][]>(() => {
 </template>
 
 <style scoped>
+/* Mobile first: one compact row (host, pills, nav); the tagline and theme name join from 640px. */
 header {
   position: sticky;
   top: 0;
   z-index: 10;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px 16px;
-  padding: 10px 16px;
+  gap: 8px;
+  padding: 6px 12px;
   background: var(--page);
   border-bottom: 1px solid var(--border);
 }
@@ -396,21 +396,70 @@ header {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  white-space: nowrap;
 }
 .brand strong {
-  font-size: 16px;
+  font-size: 15px;
 }
 .pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
+  min-width: 0;
+}
+.pills :deep(.pill) {
+  padding: 2px 8px 2px 3px;
+  font-size: 11px;
+  gap: 4px;
+}
+.pills :deep(.icon) {
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
 }
 nav {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
   font-size: 13px;
+}
+nav button.ghost {
+  padding: 4px 6px;
+}
+.wide {
+  display: none;
+}
+@media (min-width: 640px) {
+  header {
+    gap: 8px 16px;
+    padding: 10px 16px;
+  }
+  .brand strong {
+    font-size: 16px;
+  }
+  .pills {
+    gap: 6px;
+  }
+  .pills :deep(.pill) {
+    padding: 3px 10px 3px 4px;
+    font-size: 12px;
+    gap: 6px;
+  }
+  .pills :deep(.icon) {
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+  }
+  nav {
+    gap: 12px;
+  }
+  .wide {
+    display: inline;
+  }
+  nav .wide {
+    margin-left: 4px;
+  }
 }
 main {
   display: flex;

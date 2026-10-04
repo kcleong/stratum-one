@@ -28,13 +28,14 @@ const clientTitle = (c: BurstClient) =>
   <div v-else class="bursts">
     <details v-for="(b, i) in bursts" :key="b.start" :open="i === 0">
       <summary>
-        <b>{{ when(b.start) }}</b>
-        <span>{{ b.end ? duration(b) : `ongoing, ${duration(b)}` }}</span>
-        <span>peak <b>{{ fmtNum(b.peak_req_s) }}</b> req/s</span>
-        <span>{{ fmtNum(b.ntp_packets) }} requests, <b>{{ fmtNum(droppedPct(b), 0, ' %') }}</b> dropped</span>
-        <span :title="`Addresses with a request in the ${b.window_s} s before the scan`">{{ fmtNum(b.clients) }} clients ({{ fmtNum(b.clients_ipv6) }} IPv6)</span>
+        <span class="facts">
+          <span><b>{{ when(b.start) }}</b> · {{ b.end ? duration(b) : `ongoing, ${duration(b)}` }}</span>
+          <span>peak <b>{{ fmtNum(b.peak_req_s) }}</b> req/s</span>
+          <span>{{ fmtNum(b.ntp_packets) }} requests, <b>{{ fmtNum(droppedPct(b), 0, ' %') }}</b> dropped</span>
+          <span :title="`Addresses with a request in the ${b.window_s} s before the scan`">{{ fmtNum(b.clients) }} clients ({{ fmtNum(b.clients_ipv6) }} IPv6)</span>
+        </span>
       </summary>
-      <p v-if="b.scanned == null" class="sub">Client scan pending.</p>
+      <p v-if="b.scanned == null" class="sub pending">Client scan pending.</p>
       <div v-else class="detail">
         <div class="table-scroll">
           <table>
@@ -103,13 +104,22 @@ const clientTitle = (c: BurstClient) =>
   display: grid;
   gap: 8px;
 }
+/* Marker in its own column, so wrapped facts line up under the first one. */
 summary {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 6px;
+  cursor: pointer;
+  color: var(--ink-2);
+  list-style: none;
+}
+.facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 14px;
-  cursor: pointer;
-  color: var(--ink2);
-  list-style: none;
+  gap: 2px 14px;
+}
+.facts > span {
+  white-space: nowrap;
 }
 summary::-webkit-details-marker {
   display: none;
@@ -117,6 +127,8 @@ summary::-webkit-details-marker {
 /* flex hides the native marker; draw our own */
 summary::before {
   content: '▸';
+  align-self: start;
+  text-align: center;
   color: var(--muted);
   transition: transform 0.15s;
 }
@@ -126,11 +138,15 @@ details[open] > summary::before {
 summary b {
   color: var(--ink);
 }
+/* Columns only when each table fits without scrolling (address + dropped + requests). */
 .detail {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: 12px;
-  margin: 8px 0 4px;
+  margin: 8px 0 4px 16px;
+}
+.pending {
+  margin: 6px 0 0 16px;
 }
 .provider {
   max-width: 24ch;
