@@ -27,6 +27,8 @@ export const INFO: Record<string, string> = {
 
   // Server statistics
   'NTP dropped': 'NTP requests not answered because of rate limiting.',
+  'Buffer drops since boot':
+    'Packets the kernel threw away before chrony saw them: UDP socket receive buffer full (IPv4 + IPv6), or the NIC-to-stack backlog (netdev_max_backlog) full. Should stay 0; if it rises during bursts, raise the buffers.',
   'NTS-KE accepted':
     'Network Time Security key-exchange connections (TLS on TCP 4460), which clients use to set up authenticated NTP.',
   'Authenticated NTP': 'NTP requests authenticated with NTS or a symmetric key.',

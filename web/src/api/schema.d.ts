@@ -881,6 +881,16 @@ export interface components {
             mem_total_bytes: number | null;
             /** Mem Available Bytes */
             mem_available_bytes: number | null;
+            /**
+             * Udp Rcvbuf Errors
+             * @description UDP datagrams dropped since boot because a socket receive buffer was full (IPv4 + IPv6)
+             */
+            udp_rcvbuf_errors: number | null;
+            /**
+             * Softnet Dropped
+             * @description Packets dropped since boot because the queue between NIC driver and network stack (netdev_max_backlog) was full, all CPUs
+             */
+            softnet_dropped: number | null;
         };
         /** Tracking */
         Tracking: {

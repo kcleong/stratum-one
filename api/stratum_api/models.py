@@ -192,6 +192,13 @@ class SystemStatus(BaseModel):
     uptime_s: float | None
     mem_total_bytes: int | None
     mem_available_bytes: int | None
+    udp_rcvbuf_errors: int | None = Field(
+        description="UDP datagrams dropped since boot because a socket receive buffer was full (IPv4 + IPv6)"
+    )
+    softnet_dropped: int | None = Field(
+        description="Packets dropped since boot because the queue between NIC driver and network stack "
+        "(netdev_max_backlog) was full, all CPUs"
+    )
 
 
 class Status(BaseModel):

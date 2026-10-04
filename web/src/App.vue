@@ -199,6 +199,7 @@ const serverStats = computed<[string, string][]>(() => {
   return [
     ['NTP requests', fmtNum(s.ntp_packets_received)],
     ['NTP dropped', fmtNum(s.ntp_packets_dropped)],
+    ['Buffer drops since boot', `${fmtNum(sys.value?.udp_rcvbuf_errors)} socket · ${fmtNum(sys.value?.softnet_dropped)} backlog`],
     ['NTS-KE accepted', fmtNum(s.nts_ke_accepted)],
     ['Authenticated NTP', fmtNum(s.authenticated_ntp_packets)],
     ['Interleaved NTP', fmtNum(s.interleaved_ntp_packets)],
