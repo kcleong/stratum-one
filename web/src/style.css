@@ -9,6 +9,7 @@
   --grid: #e1e0d9;
   --axis: #c3c2b7;
   --border: rgba(11, 11, 11, 0.1);
+  --stripe: rgba(11, 11, 11, 0.035); /* alternate table rows */
 
   /* categorical slots, fixed order */
   --series-1: #2a78d6;
@@ -44,6 +45,7 @@
     --grid: #2c2c2a;
     --axis: #383835;
     --border: rgba(255, 255, 255, 0.1);
+    --stripe: rgba(255, 255, 255, 0.04);
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
@@ -67,6 +69,7 @@
   --grid: #2c2c2a;
   --axis: #383835;
   --border: rgba(255, 255, 255, 0.1);
+  --stripe: rgba(255, 255, 255, 0.04);
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
@@ -157,6 +160,11 @@ td.r,
 th.r {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Alternate rows so the eye can follow a row across wide tables. */
+tbody tr:nth-child(even) > td {
+  background: var(--stripe);
 }
 
 tr:last-child td {
