@@ -7,11 +7,11 @@ import time
 from collections import Counter, deque
 
 from . import system
-from .chrony import ChronyMonitor
+from .chrony import ChronycError, ChronyMonitor
 from .config import Settings
 from .geo import GeoLookup
 from .gpsd import GpsdClient
-from .models import HistoryPoint, HistorySample, Provider, Status
+from .models import Burst, HistoryPoint, HistorySample, Provider, Status
 from .pool import PoolMonitor
 from .sky import SAMPLE_S as SKY_SAMPLE_S, SkyCounter
 from .store import HistoryStore, bucket_samples
@@ -21,6 +21,10 @@ log = logging.getLogger(__name__)
 MAX_POINTS = 1500
 BUCKETS_S = (30, 60, 120, 300, 600, 900, 1800, 3600, 7200)
 TOP_PROVIDERS = 10
+BURST_WINDOW_S = 60        # burst scans: clients with a request this recent
+BURST_FIRST_SCAN_S = 15    # let per-client counters build up before the first scan
+BURST_RESCAN_S = 60
+BURSTS_KEPT = 50           # in memory, newest; the store keeps HISTORY_DAYS
 
 
 class Monitor:
@@ -51,6 +55,13 @@ class Monitor:
             if settings.pool_servers else None
         )
         self.sky = SkyCounter(settings.sky_hours)
+        self.bursts: deque[Burst] = deque(maxlen=BURSTS_KEPT)
+        self._burst_task: asyncio.Task | None = None
+        if self.store is not None:
+            try:
+                self.bursts.extend(self.store.load_bursts(time.time() - settings.history_days * 86400))
+            except sqlite3.Error as e:
+                log.warning("traffic bursts unreadable from history store: %s", e)
         if self.store is not None:
             try:
                 self.sky.load(self.store.load_sky(self._sky_first_hour()))
@@ -72,6 +83,7 @@ class Monitor:
             started = time.monotonic()
             await self.chrony.poll()
             self._record()
+            self._check_burst()
             await asyncio.sleep(max(0.0, self.settings.chrony_interval - (time.monotonic() - started)))
 
     async def run_clients(self) -> None:
@@ -85,6 +97,67 @@ class Monitor:
                 # One lookup per active client; off the event loop on a busy pool server.
                 self.providers = await asyncio.to_thread(self._top_providers, self.chrony.active_public)
             await asyncio.sleep(self.settings.clients_interval)
+
+    def _check_burst(self) -> None:
+        rate = self.chrony.ntp_requests_per_s
+        threshold = self.settings.burst_req_s
+        if threshold <= 0 or rate is None or rate < threshold:
+            return
+        if self._burst_task is None or self._burst_task.done():
+            self._burst_task = asyncio.create_task(self._watch_burst())
+
+    async def _watch_burst(self) -> None:
+        """Follow one burst until the load falls below half the threshold, rescanning its clients."""
+        threshold = self.settings.burst_req_s
+        stats = self.chrony.serverstats
+        rx0, drop0 = (stats.ntp_packets_received, stats.ntp_packets_dropped) if stats else (None, None)
+        burst = Burst(
+            start=round(time.time(), 1), end=None, peak_req_s=self.chrony.ntp_requests_per_s or 0.0,
+            ntp_packets=0, ntp_dropped=0, scanned=None, window_s=BURST_WINDOW_S,
+            clients=0, clients_ipv6=0, top_clients=[], prefixes=[], providers=[],
+        )
+        log.warning("traffic burst: %.0f NTP requests/s", burst.peak_req_s)
+        self.bursts.append(burst)
+        next_scan = time.monotonic() + BURST_FIRST_SCAN_S
+        while True:
+            await asyncio.sleep(self.settings.chrony_interval)
+            rate = self.chrony.ntp_requests_per_s
+            ended = rate is not None and rate < threshold / 2
+            update: dict = {"peak_req_s": max(burst.peak_req_s, rate or 0.0)}
+            stats = self.chrony.serverstats
+            if stats and rx0 is not None and stats.ntp_packets_received >= rx0:
+                update |= {"ntp_packets": stats.ntp_packets_received - rx0, "ntp_dropped": stats.ntp_packets_dropped - drop0}
+            if not ended and time.monotonic() >= next_scan:
+                next_scan = time.monotonic() + BURST_RESCAN_S
+                update |= await self._scan_burst()
+            if ended:
+                update["end"] = round(time.time(), 1)
+            burst = burst.model_copy(update=update)
+            self.bursts[-1] = burst
+            await self._save_burst(burst)
+            if ended:
+                log.warning("traffic burst over: %d requests, %d dropped, %d clients", burst.ntp_packets, burst.ntp_dropped, burst.clients)
+                return
+
+    async def _scan_burst(self) -> dict:
+        try:
+            count, count_v6, top, prefixes, recent = await self.chrony.scan_recent(BURST_WINDOW_S)
+        except (ChronycError, IndexError, ValueError) as e:
+            log.warning("traffic burst client scan: %s", e)
+            return {}
+        if self.geo is not None:
+            top = [c.model_copy(update=dict(zip(("country", "asn", "asn_org"), self.geo.lookup(c.address)))) for c in top]
+        providers = await asyncio.to_thread(self._top_providers, recent) if self.geo is not None else []
+        return dict(scanned=round(time.time(), 1), clients=count, clients_ipv6=count_v6,
+                    top_clients=top, prefixes=prefixes, providers=providers)
+
+    async def _save_burst(self, burst: Burst) -> None:
+        if self.store is None:
+            return
+        try:
+            await asyncio.to_thread(self.store.write_burst, burst)
+        except sqlite3.Error as e:
+            log.warning("traffic burst not saved: %s", e)
 
     def _top_providers(self, active: list[tuple[str, int]]) -> list[Provider]:
         by_asn: dict[int | None, list] = {}   # asn -> [org, clients, packets, Counter of countries]
@@ -149,6 +222,7 @@ class Monitor:
             satellites_visible=gps.satellites_visible,
             cpu_temp_c=system.snapshot().cpu_temp_c,
             ntp_requests_per_s=self.chrony.ntp_requests_per_s,
+            ntp_dropped_per_s=self.chrony.ntp_dropped_per_s,
         )
         self.history.append(sample)
         if self.store is not None:

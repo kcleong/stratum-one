@@ -186,6 +186,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/bursts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Traffic bursts: stretches of NTP load at or above BURST_REQ_S, with the clients behind them
+         * @description Newest first, kept for HISTORY_DAYS. An ongoing burst has `end` null. Empty when BURST_REQ_S is 0.
+         */
+        get: operations["bursts_api_bursts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -219,6 +239,113 @@ export interface components {
             burst_offline: number;
             /** Unresolved */
             unresolved: number;
+        };
+        /**
+         * Burst
+         * @description A stretch of NTP load at or above BURST_REQ_S, with the clients active during it.
+         *
+         *     The client part is the last scan taken while the burst lasted (rescanned every minute),
+         *     so counters have built up as far as possible.
+         */
+        Burst: {
+            /**
+             * Start
+             * @description Unix time the load first reached BURST_REQ_S
+             */
+            start: number;
+            /**
+             * End
+             * @description Unix time the load fell below half of BURST_REQ_S; null while ongoing
+             */
+            end: number | null;
+            /** Peak Req S */
+            peak_req_s: number;
+            /**
+             * Ntp Packets
+             * @description NTP requests received during the burst
+             */
+            ntp_packets: number;
+            /**
+             * Ntp Dropped
+             * @description Of those, dropped by the rate limit
+             */
+            ntp_dropped: number;
+            /**
+             * Scanned
+             * @description Unix time of the client scan; null until the first one
+             */
+            scanned: number | null;
+            /**
+             * Window S
+             * @description A client counts as part of the burst with a request this recent at scan time
+             */
+            window_s: number;
+            /**
+             * Clients
+             * @description Addresses with a request in the window
+             */
+            clients: number;
+            /** Clients Ipv6 */
+            clients_ipv6: number;
+            /**
+             * Top Clients
+             * @description Busiest addresses in the window
+             */
+            top_clients: components["schemas"]["BurstClient"][];
+            /**
+             * Prefixes
+             * @description Networks with the most addresses in the window
+             */
+            prefixes: components["schemas"]["BurstPrefix"][];
+            /**
+             * Providers
+             * @description Networks (ASN) with the most addresses in the window; empty without GEOIP_DIR
+             */
+            providers: components["schemas"]["Provider"][];
+        };
+        /** BurstClient */
+        BurstClient: {
+            /** Address */
+            address: string;
+            /**
+             * Ntp Packets
+             * @description NTP requests since chronyd created the client record
+             */
+            ntp_packets: number;
+            /**
+             * Ntp Dropped
+             * @description Of those, dropped by the rate limit
+             */
+            ntp_dropped: number;
+            /**
+             * Ntp Interval
+             * @description Average request interval, log2 seconds
+             */
+            ntp_interval: number | null;
+            /** Country */
+            country?: string | null;
+            /** Asn */
+            asn?: number | null;
+            /** Asn Org */
+            asn_org?: string | null;
+        };
+        /** BurstPrefix */
+        BurstPrefix: {
+            /**
+             * Prefix
+             * @description /24 (IPv4) or /48 (IPv6) network
+             */
+            prefix: string;
+            /**
+             * Clients
+             * @description Addresses in it active during the scan window
+             */
+            clients: number;
+            /**
+             * Ntp Packets
+             * @description NTP requests from those addresses since their records were created
+             */
+            ntp_packets: number;
         };
         /** ChronyStatus */
         ChronyStatus: {
@@ -263,6 +390,11 @@ export interface components {
              * @description NTP requests per second over the last poll interval
              */
             ntp_requests_per_s: number | null;
+            /**
+             * Ntp Dropped Per S
+             * @description NTP requests dropped by the rate limit per second over the last poll interval
+             */
+            ntp_dropped_per_s?: number | null;
         };
         /** Client */
         Client: {
@@ -456,6 +588,8 @@ export interface components {
             cpu_temp_c: number | null;
             /** Ntp Requests Per S */
             ntp_requests_per_s?: number | null;
+            /** Ntp Dropped Per S */
+            ntp_dropped_per_s?: number | null;
             /** System Time Offset Min S */
             system_time_offset_min_s?: number | null;
             /** System Time Offset Max S */
@@ -1036,6 +1170,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PoolHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bursts_api_bursts_get: {
+        parameters: {
+            query?: {
+                minutes?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Burst"][];
                 };
             };
             /** @description Validation Error */

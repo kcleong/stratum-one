@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .models import HistoryPoint, HistorySample, PoolScore
+from .models import Burst, HistoryPoint, HistorySample, PoolScore
 
 COLUMNS = list(HistorySample.model_fields)   # t first; the schema follows the model
 VALUES = COLUMNS[1:]
@@ -47,6 +47,8 @@ class HistoryStore:
         self.db.execute(
             "CREATE TABLE IF NOT EXISTS pool_scores (server TEXT, t REAL, score REAL, PRIMARY KEY (server, t)) WITHOUT ROWID"
         )
+        # Traffic bursts (see Monitor._watch_burst): one JSON document per burst, keyed by its start.
+        self.db.execute("CREATE TABLE IF NOT EXISTS bursts (start REAL PRIMARY KEY, doc TEXT) WITHOUT ROWID")
         self.db.commit()
 
     def load(self, since: float) -> list[HistorySample]:
@@ -97,6 +99,22 @@ class HistoryStore:
                 [(s.server, s.t, s.score) for s in scores],
             )
             self.db.execute("DELETE FROM pool_scores WHERE t < ?", (time.time() - self.retention_s,))
+
+    def load_bursts(self, since: float) -> list[Burst]:
+        with self.lock:
+            rows = self.db.execute("SELECT doc FROM bursts WHERE start >= ? ORDER BY start", (since,)).fetchall()
+        bursts = []
+        for (doc,) in rows:
+            try:
+                bursts.append(Burst.model_validate_json(doc))
+            except ValidationError:   # written by an older model
+                continue
+        return bursts
+
+    def write_burst(self, burst: Burst) -> None:
+        with self.lock, self.db:
+            self.db.execute("INSERT OR REPLACE INTO bursts (start, doc) VALUES (?, ?)", (burst.start, burst.model_dump_json()))
+            self.db.execute("DELETE FROM bursts WHERE start < ?", (time.time() - self.retention_s,))
 
     def load_sky(self, since_hour: int) -> list[tuple]:
         with self.lock:

@@ -179,6 +179,7 @@ class ChronyStatus(BaseModel):
     active_clients: int | None = Field(description="Clients with an NTP request in the last hour; null until the first clients poll")
     active_clients_ipv6: int | None = Field(description="Of active_clients, those using IPv6")
     ntp_requests_per_s: float | None = Field(description="NTP requests per second over the last poll interval")
+    ntp_dropped_per_s: float | None = Field(None, description="NTP requests dropped by the rate limit per second over the last poll interval")
 
 
 # --- host, aggregate, history ---
@@ -212,6 +213,7 @@ class HistorySample(BaseModel):
     satellites_visible: int
     cpu_temp_c: float | None
     ntp_requests_per_s: float | None = None   # added later: NULL in older rows
+    ntp_dropped_per_s: float | None = None    # added later: NULL in older rows
 
 
 class HistoryPoint(HistorySample):
@@ -261,6 +263,46 @@ class PoolHistory(BaseModel):
     servers: list[str] = Field(description="POOL_SERVERS; empty when pool tracking is off")
     interval_s: float = Field(description="Seconds between score fetches")
     scores: list[PoolScore]
+
+
+# --- traffic bursts ---
+
+
+class BurstClient(BaseModel):
+    address: str
+    ntp_packets: int = Field(description="NTP requests since chronyd created the client record")
+    ntp_dropped: int = Field(description="Of those, dropped by the rate limit")
+    ntp_interval: int | None = Field(description="Average request interval, log2 seconds")
+    country: str | None = None
+    asn: int | None = None
+    asn_org: str | None = None
+
+
+class BurstPrefix(BaseModel):
+    prefix: str = Field(description="/24 (IPv4) or /48 (IPv6) network")
+    clients: int = Field(description="Addresses in it active during the scan window")
+    ntp_packets: int = Field(description="NTP requests from those addresses since their records were created")
+
+
+class Burst(BaseModel):
+    """A stretch of NTP load at or above BURST_REQ_S, with the clients active during it.
+
+    The client part is the last scan taken while the burst lasted (rescanned every minute),
+    so counters have built up as far as possible.
+    """
+
+    start: float = Field(description="Unix time the load first reached BURST_REQ_S")
+    end: float | None = Field(description="Unix time the load fell below half of BURST_REQ_S; null while ongoing")
+    peak_req_s: float
+    ntp_packets: int = Field(description="NTP requests received during the burst")
+    ntp_dropped: int = Field(description="Of those, dropped by the rate limit")
+    scanned: float | None = Field(description="Unix time of the client scan; null until the first one")
+    window_s: int = Field(description="A client counts as part of the burst with a request this recent at scan time")
+    clients: int = Field(description="Addresses with a request in the window")
+    clients_ipv6: int
+    top_clients: list[BurstClient] = Field(description="Busiest addresses in the window")
+    prefixes: list[BurstPrefix] = Field(description="Networks with the most addresses in the window")
+    providers: list[Provider] = Field(description="Networks (ASN) with the most addresses in the window; empty without GEOIP_DIR")
 
 
 class Health(BaseModel):

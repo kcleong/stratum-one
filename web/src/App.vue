@@ -2,6 +2,7 @@
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useClients, useHistory, useLiveStatus, usePool, useSky } from './api/live'
 import ClientsTable from './components/ClientsTable.vue'
+import BurstsTable from './components/BurstsTable.vue'
 import ConstellationLegend from './components/ConstellationLegend.vue'
 import HistoryChart, { type Series } from './components/HistoryChart.vue'
 import KeyValues from './components/KeyValues.vue'
@@ -30,7 +31,7 @@ const RANGES = [
 const minutes = ref(60)
 const rangeLabel = computed(() => `last ${RANGES.find((r) => r.minutes === minutes.value)?.label ?? ''}`)
 const { samples, bucketSeconds, loading } = useHistory(minutes)
-const { clients, providers } = useClients()
+const { clients, providers, bursts } = useClients()
 const CLIENT_ROWS = 10
 const { pool } = usePool(minutes)
 
@@ -158,7 +159,10 @@ const hist = computed(() => {
       { name: 'Visible', data: at((s) => s.satellites_visible), step: true, dashed: true },
     ] as Series[],
     temperature: [{ name: 'CPU temperature', slot: 1, data: at((s) => s.cpu_temp_c) }] as Series[],
-    load: [{ name: 'NTP requests', slot: 1, data: at((s) => s.ntp_requests_per_s ?? null) }] as Series[],
+    load: [
+      { name: 'NTP requests', slot: 1, data: at((s) => s.ntp_requests_per_s ?? null) },
+      { name: 'Dropped (rate limit)', slot: 2, data: at((s) => s.ntp_dropped_per_s ?? null) },
+    ] as Series[],
   }
 })
 
@@ -350,6 +354,14 @@ const systemInfo = computed<[string, string][]>(() => {
         <p class="sub credit">Country and provider: <a href="https://db-ip.com" target="_blank" rel="noopener">IP data by DB-IP</a> (CC BY 4.0)</p>
       </section>
     </div>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Traffic bursts</h2>
+        <span class="sub">NTP load spikes and the clients active during them</span>
+      </div>
+      <BurstsTable :bursts="bursts" />
+    </section>
 
     <section class="bottom">
       <div class="card">

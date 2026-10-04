@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import logging
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, Query, Response, WebSocket, WebSocketDisconnect
@@ -9,6 +10,7 @@ from pydantic import TypeAdapter
 
 from .config import load_settings
 from .models import (
+    Burst,
     ChronyStatus,
     Client,
     GpsStatus,
@@ -155,6 +157,16 @@ def pool(minutes: float = Query(60, gt=0, le=MAX_HISTORY_MINUTES)) -> PoolHistor
         interval_s=monitor.pool.interval_s,
         scores=monitor.pool.since(minutes * 60),
     )
+
+
+@app.get(
+    "/api/bursts",
+    summary="Traffic bursts: stretches of NTP load at or above BURST_REQ_S, with the clients behind them",
+    description="Newest first, kept for HISTORY_DAYS. An ongoing burst has `end` null. Empty when BURST_REQ_S is 0.",
+)
+def bursts(minutes: float = Query(MAX_HISTORY_MINUTES, gt=0, le=MAX_HISTORY_MINUTES)) -> list[Burst]:
+    cutoff = time.time() - minutes * 60
+    return [b for b in reversed(_monitor().bursts) if (b.end or time.time()) >= cutoff]
 
 
 @app.get(

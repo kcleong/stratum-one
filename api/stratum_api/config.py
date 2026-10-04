@@ -21,6 +21,7 @@ class Settings:
     pool_servers: tuple[str, ...]  # addresses registered in the NTP Pool; empty = no pool score tracking
     pool_interval: float       # seconds between pool score fetches
     pool_url: str              # NTP Pool site serving /scores/<ip>/json
+    burst_req_s: float         # NTP load that starts a traffic burst capture; 0 = off
     node_id: str               # device name in HA and MQTT topics
     mqtt_host: str | None      # MQTT disabled when unset
     mqtt_port: int
@@ -50,6 +51,7 @@ def load_settings() -> Settings:
         pool_servers=tuple(env("POOL_SERVERS", "").replace(",", " ").split()),
         pool_interval=float(env("POOL_INTERVAL", "900")),
         pool_url=env("POOL_URL", "https://www.ntppool.org").rstrip("/"),
+        burst_req_s=float(env("BURST_REQ_S", "100")),
         node_id=env("NODE_ID") or socket.gethostname(),
         mqtt_host=env("MQTT_HOST") or None,
         mqtt_port=int(env("MQTT_PORT", "1883")),
