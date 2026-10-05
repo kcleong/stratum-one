@@ -310,7 +310,7 @@ export interface components {
             address: string;
             /**
              * Ntp Packets
-             * @description NTP requests since chronyd created the client record
+             * @description NTP requests since the last client poll before the burst started (bursts recorded before 2026-10-05: since chronyd created the client record)
              */
             ntp_packets: number;
             /**
@@ -344,7 +344,7 @@ export interface components {
             clients: number;
             /**
              * Ntp Packets
-             * @description NTP requests from those addresses since their records were created
+             * @description NTP requests from those addresses during the burst (same baseline as BurstClient)
              */
             ntp_packets: number;
         };

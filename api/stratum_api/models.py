@@ -277,7 +277,10 @@ class PoolHistory(BaseModel):
 
 class BurstClient(BaseModel):
     address: str
-    ntp_packets: int = Field(description="NTP requests since chronyd created the client record")
+    ntp_packets: int = Field(
+        description="NTP requests since the last client poll before the burst started "
+        "(bursts recorded before 2026-10-05: since chronyd created the client record)"
+    )
     ntp_dropped: int = Field(description="Of those, dropped by the rate limit")
     ntp_interval: int | None = Field(description="Average request interval, log2 seconds")
     country: str | None = None
@@ -288,7 +291,7 @@ class BurstClient(BaseModel):
 class BurstPrefix(BaseModel):
     prefix: str = Field(description="/24 (IPv4) or /48 (IPv6) network")
     clients: int = Field(description="Addresses in it active during the scan window")
-    ntp_packets: int = Field(description="NTP requests from those addresses since their records were created")
+    ntp_packets: int = Field(description="NTP requests from those addresses during the burst (same baseline as BurstClient)")
 
 
 class Burst(BaseModel):

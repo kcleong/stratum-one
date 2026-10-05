@@ -117,6 +117,7 @@ class Monitor:
             clients=0, clients_ipv6=0, top_clients=[], prefixes=[], providers=[],
         )
         log.warning("traffic burst: %.0f NTP requests/s", burst.peak_req_s)
+        baseline = self.chrony.counters   # last client poll before the burst; later polls replace, not mutate, it
         self.bursts.append(burst)
         next_scan = time.monotonic() + BURST_FIRST_SCAN_S
         while True:
@@ -130,7 +131,7 @@ class Monitor:
             # A burst over before its first scan still gets one: the window reaches back past its start.
             if (not ended and time.monotonic() >= next_scan) or (ended and burst.scanned is None):
                 next_scan = time.monotonic() + BURST_RESCAN_S
-                update |= await self._scan_burst()
+                update |= await self._scan_burst(baseline)
             if ended:
                 update["end"] = round(time.time(), 1)
             burst = burst.model_copy(update=update)
@@ -140,9 +141,9 @@ class Monitor:
                 log.warning("traffic burst over: %d requests, %d dropped, %d clients", burst.ntp_packets, burst.ntp_dropped, burst.clients)
                 return
 
-    async def _scan_burst(self) -> dict:
+    async def _scan_burst(self, baseline: dict[str, tuple[int, int]]) -> dict:
         try:
-            count, count_v6, top, prefixes, recent = await self.chrony.scan_recent(BURST_WINDOW_S)
+            count, count_v6, top, prefixes, recent = await self.chrony.scan_recent(BURST_WINDOW_S, baseline)
         except (ChronycError, IndexError, ValueError) as e:
             log.warning("traffic burst client scan: %s", e)
             return {}

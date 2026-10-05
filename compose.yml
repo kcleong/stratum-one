@@ -1,8 +1,6 @@
 # GPS/PPS-disciplined stratum-1 NTP server. See README.md for host prep.
 
 # Container logs to journald, which is volatile on Pi OS: nothing on the SD card.
-# chrony and gpsd get `logging: *logging` at their next planned recreate
-# (a chrony recreate costs pool score).
 x-logging: &logging
   driver: journald
 
@@ -27,6 +25,7 @@ services:
     tmpfs:
       - /run
     mem_limit: 128m
+    logging: *logging
     restart: unless-stopped
     healthcheck:                     # chronyd answers on its command socket
       test: ["CMD", "chronyc", "-n", "tracking"]
@@ -47,6 +46,7 @@ services:
       - /dev/ttyAMA2
     depends_on: [chrony]
     mem_limit: 64m
+    logging: *logging
     restart: unless-stopped
 
   api:
