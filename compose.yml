@@ -9,7 +9,7 @@ services:
     build:
       dockerfile_inline: |
         FROM alpine:3.24
-        RUN apk add --no-cache chrony-nts ca-certificates   # 3.24+: plain chrony is built without NTS
+        RUN apk add --no-cache chrony-nts ca-certificates tzdata   # 3.24+: plain chrony is built without NTS; tzdata for leapseclist
     command: chronyd -d -f /etc/chrony/chrony.conf
     network_mode: host               # UDP 123 without NAT; real client IPs
     ipc: host                        # gpsd writes NMEA time into SHM; host IPC survives restarts of either container
