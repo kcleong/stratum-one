@@ -214,6 +214,21 @@ or for systemd-timesyncd (`/etc/systemd/timesyncd.conf`): `NTP=lobsang.local`.
 `clientloglimit`); what can reach UDP 123 is decided by the router. For a LAN-only server,
 restrict it with `allow <your LAN>/24`.
 
+### NTS server
+
+`ntp.example.org` serves NTS-KE on TCP 4460 (IPv4 dst-nat on the router, IPv6 forward rule) with a
+Let's Encrypt certificate from certbot on the Pi (HTTP-01: Caddy on the router proxies
+`/.well-known/acme-challenge/` over IPv4, IPv6 reaches TCP 80 on the Pi directly):
+```
+sudo apt install certbot
+sudo cp host/certbot-chrony-nts.sh /etc/letsencrypt/renewal-hooks/deploy/
+sudo certbot certonly --standalone -d ntp.example.org
+sudo RENEWED_LINEAGE=/etc/letsencrypt/live/ntp.example.org /etc/letsencrypt/renewal-hooks/deploy/certbot-chrony-nts.sh
+```
+The hook copies the cert to `nts/` (readable by chrony, gid 101) and restarts chrony: chronyd
+loads server certificates only at start. `ntsdumpdir` keeps the server keys, so client cookies
+stay valid, and `dumpdir` with `-r` keeps the measurement history across the restart.
+
 ## Notes
 
 - **Docker does not hurt timing**: PPS is timestamped in the kernel IRQ,

@@ -10,7 +10,7 @@ services:
       dockerfile_inline: |
         FROM alpine:3.24
         RUN apk add --no-cache chrony-nts ca-certificates tzdata   # 3.24+: plain chrony is built without NTS; tzdata for leapseclist
-    command: chronyd -d -f /etc/chrony/chrony.conf
+    command: chronyd -d -r -f /etc/chrony/chrony.conf  # -r: reload dumpdir history on start
     network_mode: host               # UDP 123 without NAT; real client IPs
     ipc: host                        # gpsd writes NMEA time into SHM; host IPC survives restarts of either container
     cap_add: [SYS_TIME, SYS_NICE, IPC_LOCK]  # clock, sched_priority, lock_all
@@ -22,6 +22,7 @@ services:
       - ./chrony.conf:/etc/chrony/chrony.conf:ro
       - chrony-state:/var/lib/chrony # drift file survives restarts
       - chrony-run:/run/chrony       # chronyd.sock, shared with api
+      - ./nts:/etc/chrony/nts:ro     # NTS server cert + key, copied in by the certbot deploy hook
     tmpfs:
       - /run
     mem_limit: 128m
