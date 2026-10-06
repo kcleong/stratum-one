@@ -22,7 +22,6 @@ services:
       - ./chrony.conf:/etc/chrony/chrony.conf:ro
       - chrony-state:/var/lib/chrony # drift file survives restarts
       - chrony-run:/run/chrony       # chronyd.sock, shared with api
-      - ./nts:/etc/chrony/nts:ro     # NTS server cert + key, copied in by the certbot deploy hook
     tmpfs:
       - /run
     mem_limit: 128m

@@ -1,7 +1,5 @@
 # Secrets (MQTT credentials)
 .env
-# NTS server cert + private key (certbot deploy hook)
-nts/
 
 # Python
 __pycache__/
