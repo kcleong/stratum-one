@@ -33,6 +33,7 @@ const rangeLabel = computed(() => `last ${RANGES.find((r) => r.minutes === minut
 const { samples, bucketSeconds, loading } = useHistory(minutes)
 const { clients, providers, bursts } = useClients()
 const CLIENT_ROWS = 10
+const BURST_ROWS = 5
 const { pool } = usePool(minutes)
 
 const gps = computed(() => status.value?.gps)
@@ -359,7 +360,7 @@ const systemInfo = computed<[string, string][]>(() => {
         <h2>Traffic bursts</h2>
         <span class="sub">NTP load spikes and the clients active during them</span>
       </div>
-      <BurstsTable :bursts="bursts" />
+      <BurstsTable :bursts="bursts" :max="BURST_ROWS" />
     </section>
 
     <section class="bottom">

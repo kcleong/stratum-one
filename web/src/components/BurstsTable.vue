@@ -1,11 +1,17 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import type { Burst, BurstClient } from '../api/types'
 import { countryName, flag } from '../lib/country'
 import { fmtLog2, fmtNum, fmtUptime } from '../lib/format'
 
-defineProps<{ bursts: Burst[] }>()
+const props = defineProps<{ bursts: Burst[]; max: number }>()
 
 const ROWS = 8
+
+// Newest `max` by default: on a busy pool server there are several bursts a day.
+const all = ref(false)
+const shown = computed(() => (all.value ? props.bursts : props.bursts.slice(0, props.max)))
+const hidden = computed(() => props.bursts.length - shown.value.length)
 
 const when = (t: number) =>
   new Date(t * 1000).toLocaleString(undefined, { hour12: false, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -26,7 +32,7 @@ const clientTitle = (c: BurstClient) =>
 <template>
   <p v-if="!bursts.length" class="sub">No traffic bursts in the kept history.</p>
   <div v-else class="bursts">
-    <details v-for="(b, i) in bursts" :key="b.start" :open="i === 0">
+    <details v-for="(b, i) in shown" :key="b.start" :open="i === 0">
       <summary>
         <span class="facts">
           <span><b>{{ when(b.start) }}</b> · {{ b.end ? duration(b) : `ongoing, ${duration(b)}` }}</span>
@@ -96,6 +102,9 @@ const clientTitle = (c: BurstClient) =>
         </div>
       </div>
     </details>
+    <button v-if="hidden || all" type="button" class="ghost more" @click="all = !all">
+      {{ all ? `Show newest ${max}` : `Show all ${bursts.length}` }}
+    </button>
   </div>
 </template>
 
@@ -147,6 +156,12 @@ summary b {
 }
 .pending {
   margin: 6px 0 0 16px;
+}
+.more {
+  justify-self: start;
+  margin-left: 16px;
+  padding-left: 0;
+  padding-right: 0;
 }
 .provider {
   max-width: 24ch;
