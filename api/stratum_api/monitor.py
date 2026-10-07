@@ -23,7 +23,8 @@ BUCKETS_S = (30, 60, 120, 300, 600, 900, 1800, 3600, 7200)
 TOP_PROVIDERS = 10
 BURST_WINDOW_S = 60        # burst scans: clients with a request this recent
 BURST_FIRST_SCAN_S = 15    # let per-client counters build up before the first scan
-BURST_RESCAN_S = 60
+BURST_RESCAN_S = 60        # first rescan interval; doubles up to BURST_RESCAN_MAX_S on long bursts
+BURST_RESCAN_MAX_S = 600
 BURSTS_KEPT = 50           # in memory, newest; the store keeps HISTORY_DAYS
 
 
@@ -107,7 +108,7 @@ class Monitor:
             self._burst_task = asyncio.create_task(self._watch_burst())
 
     async def _watch_burst(self) -> None:
-        """Follow one burst until the load falls below half the threshold, rescanning its clients."""
+        """Follow one burst until the load falls below half the threshold (or chronyd restarts), rescanning its clients."""
         threshold = self.settings.burst_req_s
         stats = self.chrony.serverstats
         rx0, drop0 = (stats.ntp_packets_received, stats.ntp_packets_dropped) if stats else (None, None)
@@ -120,17 +121,24 @@ class Monitor:
         baseline = self.chrony.counters   # last client poll before the burst; later polls replace, not mutate, it
         self.bursts.append(burst)
         next_scan = time.monotonic() + BURST_FIRST_SCAN_S
+        rescan_s = BURST_RESCAN_S
         while True:
             await asyncio.sleep(self.settings.chrony_interval)
             rate = self.chrony.ntp_requests_per_s
-            ended = rate is not None and rate < threshold / 2
-            update: dict = {"peak_req_s": max(burst.peak_req_s, rate or 0.0)}
             stats = self.chrony.serverstats
-            if stats and rx0 is not None and stats.ntp_packets_received >= rx0:
+            if stats and rx0 is None:   # serverstats was missing when the burst started: count from here
+                rx0, drop0 = stats.ntp_packets_received, stats.ntp_packets_dropped
+            # Counters went backwards: chronyd restarted, the burst cannot be followed any further.
+            reset = stats is not None and rx0 is not None and stats.ntp_packets_received < rx0
+            ended = reset or (rate is not None and rate < threshold / 2)
+            update: dict = {"peak_req_s": max(burst.peak_req_s, rate or 0.0)}
+            if stats and not reset and rx0 is not None:
                 update |= {"ntp_packets": stats.ntp_packets_received - rx0, "ntp_dropped": stats.ntp_packets_dropped - drop0}
             # A burst over before its first scan still gets one: the window reaches back past its start.
+            # Rescans thin out on long bursts: streaming the whole client log every minute for hours is wasteful.
             if (not ended and time.monotonic() >= next_scan) or (ended and burst.scanned is None):
-                next_scan = time.monotonic() + BURST_RESCAN_S
+                next_scan = time.monotonic() + rescan_s
+                rescan_s = min(rescan_s * 2, BURST_RESCAN_MAX_S)
                 update |= await self._scan_burst(baseline)
             if ended:
                 update["end"] = round(time.time(), 1)

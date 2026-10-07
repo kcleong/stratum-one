@@ -297,9 +297,9 @@ class BurstPrefix(BaseModel):
 class Burst(BaseModel):
     """A stretch of NTP load at or above BURST_REQ_S, with the clients active during it.
 
-    The client part is the last scan taken while the burst lasted (rescanned every minute),
-    so counters have built up as far as possible. A burst over before its first scan is
-    scanned once as it ends.
+    The client part is the last scan taken while the burst lasted (rescanned every minute at
+    first, then less often), so counters have built up as far as possible. A burst over before
+    its first scan is scanned once as it ends. A chronyd restart ends an ongoing burst.
     """
 
     start: float = Field(description="Unix time the load first reached BURST_REQ_S")

@@ -159,10 +159,11 @@ dashboard then hides the chart.
 **Traffic bursts**: when the NTP load reaches `BURST_REQ_S` (100 req/s), the
 api scans chronyd's client log for the addresses active in the last 60 s:
 the busiest ones, the /24 and /48 networks with the most addresses, and their
-providers (with `GEOIP_DIR`). It rescans every minute until the load falls
-below half the threshold, records requests and rate-limit drops during the
-burst, and keeps each burst for `HISTORY_DAYS` (`GET /api/bursts`, the
-dashboard's Traffic bursts card). Drops per second are charted with the NTP
+providers (with `GEOIP_DIR`). It rescans while the burst lasts (every minute
+at first, then less often, at most every 10 min) until the load falls below
+half the threshold or chronyd restarts, records requests and rate-limit drops
+during the burst, and keeps each burst for `HISTORY_DAYS` (`GET /api/bursts`,
+the dashboard's Traffic bursts card). Drops per second are charted with the NTP
 load. Set `BURST_REQ_S=0` to turn the scans off.
 
 The API has no authentication and shows the GPS position and NTP client

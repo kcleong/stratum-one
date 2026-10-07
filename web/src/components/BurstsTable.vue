@@ -24,7 +24,7 @@ const clientTitle = (c: BurstClient) =>
 </script>
 
 <template>
-  <p v-if="!bursts.length" class="sub">No traffic bursts in the last 30 days.</p>
+  <p v-if="!bursts.length" class="sub">No traffic bursts in the kept history.</p>
   <div v-else class="bursts">
     <details v-for="(b, i) in bursts" :key="b.start" :open="i === 0">
       <summary>
@@ -59,7 +59,7 @@ const clientTitle = (c: BurstClient) =>
             </tbody>
           </table>
         </div>
-        <div class="table-scroll">
+        <div v-if="b.prefixes.length" class="table-scroll">
           <table>
             <thead>
               <tr>
