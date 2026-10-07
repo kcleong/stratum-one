@@ -88,6 +88,11 @@ docker compose logs -f
 
 Containers restart automatically on boot (`restart: unless-stopped`).
 
+To redeploy only the api (dashboard or API changes) without touching chronyd:
+```
+docker compose up -d --build --no-deps api
+```
+
 ## Check
 
 ```
