@@ -102,8 +102,9 @@ const clientTitle = (c: BurstClient) =>
         </div>
       </div>
     </details>
-    <button v-if="hidden || all" type="button" class="ghost more" @click="all = !all">
-      {{ all ? `Show newest ${max}` : `Show all ${bursts.length}` }}
+    <button v-if="hidden || all" type="button" class="more" :class="{ open: all }" @click="all = !all">
+      <span v-if="all">Show the newest <b>{{ max }}</b></span>
+      <span v-else><b>{{ hidden }}</b> older {{ hidden === 1 ? 'burst' : 'bursts' }} · show all</span>
     </button>
   </div>
 </template>
@@ -157,11 +158,42 @@ summary b {
 .pending {
   margin: 6px 0 0 16px;
 }
+/* Reads as one more row: same marker column as the summaries, ▾ instead of ▸. */
 .more {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 6px;
   justify-self: start;
-  margin-left: 16px;
-  padding-left: 0;
-  padding-right: 0;
+  padding: 2px 6px 2px 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ink-2);
+  font-size: 13px;
+  text-align: left;
+}
+.more::before {
+  content: '▾';
+  text-align: center;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.more.open::before {
+  transform: rotate(180deg);
+}
+.more:hover {
+  background: none;
+  color: var(--ink);
+}
+.more:hover::before {
+  color: var(--ink-2);
+}
+.more:focus-visible {
+  outline: 2px solid var(--series-1);
+  outline-offset: 2px;
+}
+.more b {
+  color: var(--ink);
 }
 .provider {
   max-width: 24ch;
