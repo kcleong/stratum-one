@@ -1,0 +1,5 @@
+# Overrides /usr/lib/udev/rules.d/60-ondemand-governor.rules (raspberrypi-sys-mods),
+# which switches every CPU to ondemand after boot and so beats
+# cpufreq.default_governor=performance on the kernel command line.
+# A fixed clock keeps PPS latency and the crystal temperature steady.
+KERNEL=="cpu*", SUBSYSTEM=="cpu", ATTR{cpufreq/scaling_governor}="performance"

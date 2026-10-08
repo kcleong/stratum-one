@@ -71,10 +71,18 @@ Give the antenna a clear sky view; first fix can take several minutes.
    sudo systemctl enable --now eth0-irq-affinity
    ```
 
+   CPU governor `performance` (Pi OS forces ondemand via a udev rule; this
+   file of the same name overrides it):
+   ```
+   sudo cp host/60-ondemand-governor.rules /etc/udev/rules.d/
+   echo performance | sudo tee /sys/devices/system/cpu/cpufreq/policy0/scaling_governor
+   ```
+
 7. **Reboot**, then verify:
    ```
    ls -l /dev/pps0 /dev/ttyAMA2
    grep -E "eth0|pps" /proc/interrupts      # eth0 counts grow on CPU2, pps on CPU0
+   cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # performance
    grep memory /sys/fs/cgroup/cgroup.controllers
    sudo apt install pps-tools && sudo ppstest /dev/pps0   # one line per second once GPS has a fix
    ```

@@ -3,8 +3,11 @@
 # timestamp is taken in the hard IRQ, so a network IRQ on CPU0 can delay it.
 [Unit]
 Description=Move eth0 IRQs to CPU2 (PPS keeps CPU0)
-After=sys-subsystem-net-devices-eth0.device
-Wants=sys-subsystem-net-devices-eth0.device
+# bcmgenet requests its IRQs when eth0 is opened, which resets their
+# affinity; run after the link is up (2026-10-08 boot: ran too early, both
+# IRQs back on 0-3).
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
