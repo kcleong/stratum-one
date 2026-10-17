@@ -20,6 +20,8 @@ services:
       - /dev/pps0
     volumes:
       - ./chrony.conf:/etc/chrony/chrony.conf:ro
+      - ./chrony-tempcomp.points:/etc/chrony/tempcomp.points:ro
+      - /usr/share/zoneinfo/leap-seconds.list:/usr/share/zoneinfo/leap-seconds.list:ro  # host tzdata
       - chrony-state:/var/lib/chrony # drift file survives restarts
       - chrony-run:/run/chrony       # chronyd.sock, shared with api
     tmpfs:

@@ -117,6 +117,23 @@ fix, look at the `GPS` line in `chronyc sourcestats` (Offset column) and
 set `offset` in `chrony.conf` so the GPS offset is near 0 relative to PPS.
 Then `docker compose restart chrony`.
 
+### Temperature compensation
+
+The Pi's crystal runs faster when warm (about 2.5 ppm over 44.5-47.5 °C CPU temperature in
+the Argon NEO case). `tempcomp` in `chrony.conf` corrects for it from the points file
+`chrony-tempcomp.points` (temperature in m°C, compensation in ppm), which keeps holdover
+tight when GPS drops out. Outside the measured range the compensation stays flat.
+
+Refit when the temperature range has grown (new season, other case or load). Fit only data
+from before tempcomp was enabled (2026-10-17 16:51): with it active, `frequency_ppm` no
+longer shows the crystal's raw dependence (chronyd logs the applied compensation in
+`tempcomp.log` in the chrony-state volume). The script merges into the existing file:
+```
+python3 host/tempcomp_fit.py --since 2026-10-09T20:30 --until 2026-10-17T16:45 --dry-run
+python3 host/tempcomp_fit.py --since 2026-10-09T20:30 --until 2026-10-17T16:45
+docker compose up -d chrony
+```
+
 ## Stats API and Home Assistant
 
 The `api` service (FastAPI, `api/`) serves GPS and chrony stats on port 8000
