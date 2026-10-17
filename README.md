@@ -124,14 +124,18 @@ the Argon NEO case). `tempcomp` in `chrony.conf` corrects for it from the points
 `chrony-tempcomp.points` (temperature in m°C, compensation in ppm), which keeps holdover
 tight when GPS drops out. Outside the measured range the compensation stays flat.
 
-Refit when the temperature range has grown (new season, other case or load). Fit only data
-from before tempcomp was enabled (2026-10-17 16:51): with it active, `frequency_ppm` no
-longer shows the crystal's raw dependence (chronyd logs the applied compensation in
-`tempcomp.log` in the chrony-state volume). The script merges into the existing file:
+Refit when the temperature range has grown (new season, other case or load). Since
+tempcomp is on (2026-10-17 16:51), `frequency_ppm` is compensated: the fit rebuilds the raw
+frequency from chronyd's `tempcomp.log` (chrony-state volume, not rotated: truncate now and
+then). The script merges into the existing file, shows the diff and asks before restarting
+chrony (~4 NTP pool points):
 ```
-python3 host/tempcomp_fit.py --since 2026-10-09T20:30 --until 2026-10-17T16:45 --dry-run
-python3 host/tempcomp_fit.py --since 2026-10-09T20:30 --until 2026-10-17T16:45
-docker compose up -d chrony
+host/tempcomp_refit.sh
+```
+Before the first refit, set `COMP_SIGN` in `host/tempcomp_fit.py` from
+```
+docker compose exec -T chrony cat /var/lib/chrony/tempcomp.log > /tmp/tempcomp.log
+python3 host/tempcomp_fit.py --comp-log /tmp/tempcomp.log --check-sign
 ```
 
 ## Stats API and Home Assistant
