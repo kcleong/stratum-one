@@ -124,6 +124,11 @@ the Argon NEO case). `tempcomp` in `chrony.conf` corrects for it from the points
 `chrony-tempcomp.points` (temperature in m°C, compensation in ppm), which keeps holdover
 tight when GPS drops out. Outside the measured range the compensation stays flat.
 
+chronyd reads the temperature every 30 s from `/run/tempcomp/temp`, a 5 min moving average
+written by the `tempsmooth` service. The raw sensor is load noise in 0.5 °C steps; read
+directly (2026-10-17 16:51-21:30), single reads stepped the compensation by up to 2 ppm and
+put ~10 µs spikes on the offset. The fit works on averaged temperatures as well.
+
 Refit when the temperature range has grown (new season, other case or load). Since
 tempcomp is on (2026-10-17 16:51), `frequency_ppm` is compensated: the fit rebuilds the raw
 frequency from chronyd's `tempcomp.log` (chrony-state volume, not rotated: truncate now and

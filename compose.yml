@@ -24,8 +24,12 @@ services:
       - /usr/share/zoneinfo/leap-seconds.list:/usr/share/zoneinfo/leap-seconds.list:ro  # host tzdata
       - chrony-state:/var/lib/chrony # drift file survives restarts
       - chrony-run:/run/chrony       # chronyd.sock, shared with api
+      - tempcomp-run:/run/tempcomp:ro  # smoothed CPU temperature for tempcomp
     tmpfs:
       - /run
+    depends_on:
+      tempsmooth:
+        condition: service_healthy
     mem_limit: 128m
     logging: *logging
     restart: unless-stopped
@@ -35,6 +39,41 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  # CPU temperature as a 5 min moving average (EMA, 5 s samples) for chrony's tempcomp.
+  # The raw sensor jumps up to ~2.4 °C between reads; read directly every 30 s, that stepped
+  # the compensation by up to 2 ppm and put ~10 µs spikes on the offset.
+  tempsmooth:
+    image: alpine:3.24
+    command:
+      - sh
+      - -c
+      - |
+        f=/sys/class/thermal/thermal_zone0/temp; o=/run/tempcomp/temp
+        e=$$(( $$(cat $$f) * 60 ))
+        while :; do
+          e=$$(( e + $$(cat $$f) - e / 60 ))
+          echo $$(( e / 60 )) > $$o.tmp && mv $$o.tmp $$o
+          sleep 5
+        done
+    init: true                       # sh as PID 1 would ignore SIGTERM
+    network_mode: none
+    user: "100:101"
+    volumes:
+      - tempcomp-run:/run/tempcomp
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 16m
+    logging: *logging
+    restart: unless-stopped
+    healthcheck:                     # file rewritten within the last minute
+      test: ["CMD-SHELL", "test -n \"$$(find /run/tempcomp/temp -mmin -1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+      start_interval: 2s
 
   gpsd:
     build:
@@ -86,3 +125,8 @@ volumes:
       type: tmpfs
       device: tmpfs
       o: uid=100,gid=101,mode=0750
+  tempcomp-run:                      # tmpfs: rewritten every 5 s, keep it off the SD card
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: uid=100,gid=101,mode=0755
