@@ -195,15 +195,15 @@ score (the pool's "recentmedian" of its monitors) from
 `HISTORY_DAYS` in the same SQLite file. Leave it unset to disable; the
 dashboard then hides the chart.
 
-**Traffic bursts**: when the NTP load reaches `BURST_REQ_S` (100 req/s), the
-api scans chronyd's client log for the addresses active in the last 60 s:
-the busiest ones, the /24 and /48 networks with the most addresses, and their
-providers (with `GEOIP_DIR`). It rescans while the burst lasts (every minute
-at first, then less often, at most every 10 min) until the load falls below
-half the threshold or chronyd restarts, records requests and rate-limit drops
-during the burst, and keeps each burst for `HISTORY_DAYS` (`GET /api/bursts`,
-the dashboard's Traffic bursts card). Drops per second are charted with the NTP
-load. Set `BURST_REQ_S=0` to turn the scans off.
+**NTP clients**: every `CLIENTS_INTERVAL` seconds (3600) the api streams
+chronyd's whole client log (`chronyc clients`) for the busiest clients, the
+count of clients active in the last hour and their providers. On a pool server
+that log holds hundreds of thousands of records and every dump goes through
+chronyd's command socket (3 s at 234k records), so keep the interval long.
+Suspected to hurt timing: offsets were ~10× smaller right after a chronyd
+restart, while the log was small, and grew over the hours after (2026-10-18).
+The traffic burst capture, which rescanned the log during every load spike,
+was removed for the same reason.
 
 The API has no authentication and shows the GPS position and NTP client
 addresses; keep port 8000 on the LAN.

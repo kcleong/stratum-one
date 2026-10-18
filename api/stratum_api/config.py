@@ -11,7 +11,7 @@ class Settings:
     gpsd_host: str
     gpsd_port: int
     chrony_interval: float     # seconds between chronyc polls (also history resolution)
-    clients_interval: float    # seconds between `chronyc clients` polls (large on a public server)
+    clients_interval: float    # seconds between `chronyc clients` polls; each streams chronyd's whole client log
     history_hours: float       # in memory at full resolution
     history_days: float        # kept in SQLite, served as bucket averages
     history_db: str | None     # SQLite path; history is memory-only when unset
@@ -21,7 +21,6 @@ class Settings:
     pool_servers: tuple[str, ...]  # addresses registered in the NTP Pool; empty = no pool score tracking
     pool_interval: float       # seconds between pool score fetches
     pool_url: str              # NTP Pool site serving /scores/<ip>/json
-    burst_req_s: float         # NTP load that starts a traffic burst capture; 0 = off
     node_id: str               # device name in HA and MQTT topics
     mqtt_host: str | None      # MQTT disabled when unset
     mqtt_port: int
@@ -41,7 +40,7 @@ def load_settings() -> Settings:
         gpsd_host=env("GPSD_HOST", "127.0.0.1"),
         gpsd_port=int(env("GPSD_PORT", "2947")),
         chrony_interval=float(env("CHRONY_INTERVAL", "5")),
-        clients_interval=float(env("CLIENTS_INTERVAL", "60")),
+        clients_interval=float(env("CLIENTS_INTERVAL", "3600")),
         history_hours=float(env("HISTORY_HOURS", "24")),
         history_days=float(env("HISTORY_DAYS", "30")),
         history_db=env("HISTORY_DB", "/data/history.db") or None,
@@ -51,7 +50,6 @@ def load_settings() -> Settings:
         pool_servers=tuple(env("POOL_SERVERS", "").replace(",", " ").split()),
         pool_interval=float(env("POOL_INTERVAL", "900")),
         pool_url=env("POOL_URL", "https://www.ntppool.org").rstrip("/"),
-        burst_req_s=float(env("BURST_REQ_S", "100")),
         node_id=env("NODE_ID") or socket.gethostname(),
         mqtt_host=env("MQTT_HOST") or None,
         mqtt_port=int(env("MQTT_PORT", "1883")),

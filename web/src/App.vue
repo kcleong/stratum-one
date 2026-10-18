@@ -2,7 +2,6 @@
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useClients, useHistory, useLiveStatus, usePool, useSky } from './api/live'
 import ClientsTable from './components/ClientsTable.vue'
-import BurstsTable from './components/BurstsTable.vue'
 import ConstellationLegend from './components/ConstellationLegend.vue'
 import HistoryChart, { type Series } from './components/HistoryChart.vue'
 import KeyValues from './components/KeyValues.vue'
@@ -31,9 +30,8 @@ const RANGES = [
 const minutes = ref(60)
 const rangeLabel = computed(() => `last ${RANGES.find((r) => r.minutes === minutes.value)?.label ?? ''}`)
 const { samples, bucketSeconds, loading } = useHistory(minutes)
-const { clients, providers, bursts } = useClients()
+const { clients, providers } = useClients()
 const CLIENT_ROWS = 10
-const BURST_ROWS = 5
 const { pool } = usePool(minutes)
 
 const gps = computed(() => status.value?.gps)
@@ -354,14 +352,6 @@ const systemInfo = computed<[string, string][]>(() => {
         <p class="sub credit">Country and provider: <a href="https://db-ip.com" target="_blank" rel="noopener">IP data by DB-IP</a> (CC BY 4.0)</p>
       </section>
     </div>
-
-    <section class="card">
-      <div class="card-head">
-        <h2>Traffic bursts</h2>
-        <span class="sub">NTP load spikes and the clients active during them</span>
-      </div>
-      <BurstsTable :bursts="bursts" :max="BURST_ROWS" />
-    </section>
 
     <section class="bottom">
       <div class="card">

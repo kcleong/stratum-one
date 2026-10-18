@@ -272,50 +272,6 @@ class PoolHistory(BaseModel):
     scores: list[PoolScore]
 
 
-# --- traffic bursts ---
-
-
-class BurstClient(BaseModel):
-    address: str
-    ntp_packets: int = Field(
-        description="NTP requests since the last client poll before the burst started "
-        "(bursts recorded before 2026-10-05: since chronyd created the client record)"
-    )
-    ntp_dropped: int = Field(description="Of those, dropped by the rate limit")
-    ntp_interval: int | None = Field(description="Average request interval, log2 seconds")
-    country: str | None = None
-    asn: int | None = None
-    asn_org: str | None = None
-
-
-class BurstPrefix(BaseModel):
-    prefix: str = Field(description="/24 (IPv4) or /48 (IPv6) network")
-    clients: int = Field(description="Addresses in it active during the scan window")
-    ntp_packets: int = Field(description="NTP requests from those addresses during the burst (same baseline as BurstClient)")
-
-
-class Burst(BaseModel):
-    """A stretch of NTP load at or above BURST_REQ_S, with the clients active during it.
-
-    The client part is the last scan taken while the burst lasted (rescanned every minute at
-    first, then less often), so counters have built up as far as possible. A burst over before
-    its first scan is scanned once as it ends. A chronyd restart ends an ongoing burst.
-    """
-
-    start: float = Field(description="Unix time the load first reached BURST_REQ_S")
-    end: float | None = Field(description="Unix time the load fell below half of BURST_REQ_S; null while ongoing")
-    peak_req_s: float
-    ntp_packets: int = Field(description="NTP requests received during the burst")
-    ntp_dropped: int = Field(description="Of those, dropped by the rate limit")
-    scanned: float | None = Field(description="Unix time of the client scan; null until the first one")
-    window_s: int = Field(description="A client counts as part of the burst with a request this recent at scan time")
-    clients: int = Field(description="Addresses with a request in the window")
-    clients_ipv6: int
-    top_clients: list[BurstClient] = Field(description="Busiest addresses in the window")
-    prefixes: list[BurstPrefix] = Field(description="Networks with the most addresses in the window")
-    providers: list[Provider] = Field(description="Networks (ASN) with the most addresses in the window; empty without GEOIP_DIR")
-
-
 class Health(BaseModel):
     gpsd: bool
     chrony: bool

@@ -7,7 +7,7 @@ import logging
 import time
 from collections.abc import AsyncIterator
 
-from .models import Activity, BurstClient, BurstPrefix, ChronyStatus, Client, ServerStats, Source, SourceStats, Tracking
+from .models import Activity, ChronyStatus, Client, ServerStats, Source, SourceStats, Tracking
 
 log = logging.getLogger(__name__)
 
@@ -43,8 +43,6 @@ UNSET_INTERVAL = 127        # clients: interval not known yet
 UNSET_LAST = 4294967295     # clients: never seen
 CLIENTS_TOP = 50            # busiest clients kept; a public pool server sees tens of thousands
 ACTIVE_WINDOW_S = 3600      # a client counts as active with an NTP request this recent
-SCAN_TOP = 20               # burst scans: busiest addresses and networks kept
-BASELINE_MIN_PACKETS = 32   # burst baseline keeps busier records only; smaller ones count in full (error < 32)
 
 
 class ChronycError(Exception):
@@ -183,9 +181,6 @@ class ChronyMonitor:
         self.active_clients: int | None = None
         self.active_clients_ipv6: int | None = None
         self.active_public: list[tuple[str, int]] = []   # (address, ntp_packets) of active non-LAN clients
-        # address -> (ntp_packets, ntp_dropped) at the last client poll: a burst ranks clients
-        # by what they sent since then, not by their totals since the record was created.
-        self.counters: dict[str, tuple[int, int]] = {}
         self.ntp_requests_per_s: float | None = None
         self.ntp_dropped_per_s: float | None = None
         self._last_rx: tuple[float, int, int] | None = None   # (monotonic time, ntp_packets_received, ntp_packets_dropped)
@@ -246,15 +241,12 @@ class ChronyMonitor:
         busiest: list[tuple[int, int, list[str]]] = []   # min-heap of (ntp_packets, seq, row)
         lan: list[list[str]] = []
         active_public: list[tuple[str, int]] = []
-        counters: dict[str, tuple[int, int]] = {}
         try:
             async for rows in chronyc_rows("-n", "clients"):
                 for row in rows:
                     count += 1
                     packets = int(row[1])
                     is_lan = _is_lan(row[0])
-                    if packets >= BASELINE_MIN_PACKETS and not is_lan:
-                        counters[row[0]] = (packets, int(row[2]))
                     if packets and (last := _int(row[5], UNSET_LAST)) is not None and last <= ACTIVE_WINDOW_S:
                         active += 1
                         active_v6 += ":" in row[0]
@@ -275,50 +267,7 @@ class ChronyMonitor:
         self.active_clients = active
         self.active_clients_ipv6 = active_v6
         self.active_public = active_public
-        self.counters = counters
         self.clients = clients
-
-    async def scan_recent(
-        self, window_s: int, baseline: dict[str, tuple[int, int]]
-    ) -> tuple[int, int, list[BurstClient], list[BurstPrefix], list[tuple[str, int]]]:
-        """Clients with an NTP request in the last `window_s`: (count, IPv6 count, busiest,
-        networks with the most addresses, every (address, ntp_packets) for an ASN breakdown).
-        Requests count from `baseline` (address -> (ntp_packets, ntp_dropped), see `counters`);
-        an address not in it counts in full.
-
-        Raises ChronycError when chronyc fails.
-        """
-        count = count_v6 = 0
-        busiest: list[tuple[int, int, list[str], int]] = []   # min-heap of (packets, seq, row, dropped)
-        prefixes: dict[str, list[int]] = {}               # prefix -> [addresses, packets]
-        recent: list[tuple[str, int]] = []
-        async for rows in chronyc_rows("-n", "clients"):
-            for row in rows:
-                last = _int(row[5], UNSET_LAST)
-                if last is None or last > window_s or _is_lan(row[0]):
-                    continue
-                count += 1
-                # max(0, ...): a record recreated since the baseline restarts its counters
-                before = baseline.get(row[0], (0, 0))
-                packets = max(0, int(row[1]) - before[0])
-                dropped = max(0, int(row[2]) - before[1])
-                v6 = ":" in row[0]
-                count_v6 += v6
-                recent.append((row[0], packets))
-                entry = prefixes.setdefault(_prefix(row[0], v6), [0, 0])
-                entry[0] += 1
-                entry[1] += packets
-                if len(busiest) < SCAN_TOP:
-                    heapq.heappush(busiest, (packets, count, row, dropped))
-                elif packets > busiest[0][0]:
-                    heapq.heapreplace(busiest, (packets, count, row, dropped))
-            await asyncio.sleep(0)
-        top = [
-            BurstClient(address=r[0], ntp_packets=packets, ntp_dropped=dropped, ntp_interval=_int(r[3], UNSET_INTERVAL))
-            for packets, _, r, dropped in sorted(busiest, reverse=True)
-        ]
-        nets = sorted(prefixes.items(), key=lambda kv: (kv[1][0], kv[1][1]), reverse=True)[:SCAN_TOP]
-        return count, count_v6, top, [BurstPrefix(prefix=p, clients=n, ntp_packets=k) for p, (n, k) in nets], recent
 
     @property
     def selected_source(self) -> Source | None:
@@ -346,14 +295,6 @@ class ChronyMonitor:
             ntp_requests_per_s=self.ntp_requests_per_s,
             ntp_dropped_per_s=self.ntp_dropped_per_s,
         )
-
-
-def _prefix(address: str, v6: bool) -> str:
-    """/24 for IPv4, /48 for IPv6: roughly one customer or site."""
-    try:
-        return str(ipaddress.ip_network(f"{address}/{48 if v6 else 24}", strict=False))
-    except ValueError:
-        return address
 
 
 def _is_lan(address: str) -> bool:
