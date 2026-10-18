@@ -30,7 +30,7 @@ services:
     depends_on:
       tempsmooth:
         condition: service_healthy
-    mem_limit: 128m
+    mem_limit: 384m                  # clientloglimit 128 MiB, locked (lock_all)
     logging: *logging
     restart: unless-stopped
     healthcheck:                     # chronyd answers on its command socket
@@ -107,7 +107,7 @@ services:
     security_opt: [no-new-privileges:true]
     depends_on: [chrony, gpsd]
     cpus: 1.0                        # runaway guard; chronyd runs at RT priority anyway
-    mem_limit: 192m                  # ~60 MiB with 24 h history + headroom for requests
+    mem_limit: 512m                  # ~135 MiB at netspeed 50 Mbit (2026-10-18); generous headroom
     logging: *logging
     restart: unless-stopped
     healthcheck:                     # HTTP server responsive and gpsd + chronyd reachable (503 otherwise)
