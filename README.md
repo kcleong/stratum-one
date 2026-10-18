@@ -195,7 +195,7 @@ score (the pool's "recentmedian" of its monitors) from
 `HISTORY_DAYS` in the same SQLite file. Leave it unset to disable; the
 dashboard then hides the chart.
 
-**NTP clients**: every `CLIENTS_INTERVAL` seconds (3600) the api streams
+**NTP clients**: every `CLIENTS_INTERVAL` seconds (10800, 3 h) the api streams
 chronyd's whole client log (`chronyc clients`) for the busiest clients, the
 count of clients active in the last hour and their providers. On a pool server
 that log holds hundreds of thousands of records and every dump goes through

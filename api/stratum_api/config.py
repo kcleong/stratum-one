@@ -40,7 +40,7 @@ def load_settings() -> Settings:
         gpsd_host=env("GPSD_HOST", "127.0.0.1"),
         gpsd_port=int(env("GPSD_PORT", "2947")),
         chrony_interval=float(env("CHRONY_INTERVAL", "5")),
-        clients_interval=float(env("CLIENTS_INTERVAL", "3600")),
+        clients_interval=float(env("CLIENTS_INTERVAL", "10800")),
         history_hours=float(env("HISTORY_HOURS", "24")),
         history_days=float(env("HISTORY_DAYS", "30")),
         history_db=env("HISTORY_DB", "/data/history.db") or None,
