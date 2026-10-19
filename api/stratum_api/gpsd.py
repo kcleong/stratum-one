@@ -14,6 +14,19 @@ FIX_MODES = {0: "unknown", 1: "no_fix", 2: "2d", 3: "3d"}
 GNSS = {0: "GPS", 1: "SBAS", 2: "Galileo", 3: "BeiDou", 4: "IMES", 5: "QZSS", 6: "GLONASS", 7: "NavIC"}
 
 
+def _dedupe(sats: list) -> list:
+    """One entry per satellite: gpsd now and then lists one twice (~3 % of SKY lists),
+    which left frozen ghost rows in the dashboard table (keyed on PRN). Keep the used one,
+    else the strongest."""
+    best: dict = {}
+    for s in sats:
+        key = (s.get("gnssid"), s.get("svid")) if s.get("svid") is not None else s.get("PRN")
+        old = best.get(key)
+        if old is None or (bool(s.get("used")), s.get("ss") or 0) > (bool(old.get("used")), old.get("ss") or 0):
+            best[key] = s
+    return list(best.values())
+
+
 class GpsdClient:
     def __init__(self, host: str, port: int):
         self.host = host
@@ -91,7 +104,7 @@ class GpsdClient:
 
     def _commit_pending(self) -> None:
         if self._pending:
-            self.satellites = self._pending[1]
+            self.satellites = _dedupe(self._pending[1])
             self._pending = None
 
     def snapshot(self) -> GpsStatus:
