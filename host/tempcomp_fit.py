@@ -32,7 +32,7 @@ BIN_C = 0.5
 MIN_SAMPLES = 5
 SENTINELS_MC = (20000, 80000)
 TEMPCOMP_SINCE = dt.datetime(2026, 10, 17, 16, 51).timestamp()   # local time, chrony restart
-COMP_SIGN = None   # +1 or -1, set from --check-sign once tempcomp has run a few days
+COMP_SIGN = -1     # from --check-sign 2026-10-19: rms diff -1 0.105, +1 0.260 ppm (4 bins only)
 
 
 def load_history(url, minutes):
